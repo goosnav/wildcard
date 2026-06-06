@@ -1,0 +1,24 @@
+{"id": "tip-splitter", "category": "calculator", "prompt": "a tip splitter that remembers my usual tip percentage"}
+{"id": "percentage-calc", "category": "calculator", "prompt": "a calculator for working out percentages of a number"}
+{"id": "bmi-calc", "category": "calculator", "prompt": "a BMI calculator that takes height and weight"}
+{"id": "loan-payment", "category": "calculator", "prompt": "work out the monthly payment on a loan from amount, rate and years"}
+{"id": "unit-converter", "category": "calculator", "prompt": "convert miles to kilometers and back"}
+{"id": "temp-converter", "category": "calculator", "prompt": "a temperature converter between celsius and fahrenheit"}
+{"id": "countdown-timer", "category": "timer", "prompt": "a countdown timer I can set in minutes"}
+{"id": "stopwatch", "category": "timer", "prompt": "a stopwatch with start, stop and reset"}
+{"id": "pomodoro", "category": "timer", "prompt": "a pomodoro timer with 25 minute work and 5 minute break"}
+{"id": "dice-roller", "category": "generator", "prompt": "a dice roller for one or two six-sided dice"}
+{"id": "coin-flipper", "category": "generator", "prompt": "a coin flipper that shows heads or tails"}
+{"id": "random-number", "category": "generator", "prompt": "pick a random number between two values I choose"}
+{"id": "password-gen", "category": "generator", "prompt": "a password generator with a length slider"}
+{"id": "team-picker", "category": "generator", "prompt": "split a list of names into two random teams"}
+{"id": "decision-spinner", "category": "generator", "prompt": "a yes or no decision maker I can tap"}
+{"id": "tally-counter", "category": "tracker", "prompt": "a tally counter that remembers the count between sessions"}
+{"id": "habit-tracker", "category": "tracker", "prompt": "a daily habit tracker with checkmarks for the week"}
+{"id": "water-tracker", "category": "tracker", "prompt": "track how many glasses of water I drink today"}
+{"id": "quick-notepad", "category": "notes", "prompt": "a quick notepad for jotting ideas that saves what I type"}
+{"id": "word-counter", "category": "notes", "prompt": "count the words and characters in some text I paste"}
+{"id": "grocery-list", "category": "list", "prompt": "a grocery checklist I can add items to and check off"}
+{"id": "todo-list", "category": "list", "prompt": "a simple todo list that persists my tasks"}
+{"id": "packing-list", "category": "list", "prompt": "a packing checklist for a trip"}
+{"id": "color-hex", "category": "utility", "prompt": "pick a color and show me its hex code to copy"}

@@ -44,6 +44,9 @@ Thumbs.db
 # ---- Local data store (JSON-file persistence for the v1 lean slice) ----
 .data/
 
+# ---- Eval run reports (generated; corpus is tracked, reports are not) ----
+eval/reports/
+
 # ---- Misc ----
 appengine-generated/
 *.local
