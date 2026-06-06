@@ -4,5 +4,7 @@ export default defineConfig({
   testDir: "./test",
   fullyParallel: true,
   reporter: [["list"]],
-  use: { ...devices["Desktop Chrome"] },
+  // `channel: "chromium"` runs the full Chromium build with the new headless
+  // mode, so we don't depend on the separate chromium-headless-shell download.
+  use: { ...devices["Desktop Chrome"], channel: "chromium" },
 });
