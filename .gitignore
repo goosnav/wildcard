@@ -17,6 +17,7 @@ blob-report/
 playwright/.cache/
 .playwright/
 .vitest/
+.vite/
 
 # ---- Logs ----
 *.log
@@ -36,6 +37,9 @@ pnpm-debug.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# ---- Claude Code (keep shareable launch.json; ignore per-user local state) ----
+.claude/settings.local.json
 
 # ---- Misc ----
 appengine-generated/

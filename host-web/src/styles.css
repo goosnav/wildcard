@@ -1,0 +1,270 @@
+:root {
+  --bg: #0b0b10;
+  --panel: #15151f;
+  --panel-2: #1d1d2b;
+  --line: #2a2a3c;
+  --text: #ecedf5;
+  --muted: #9a9ab0;
+  --accent: #7c5cff;
+  --accent-2: #a98bff;
+  --ok: #4fd08a;
+  --fail: #ff7a7a;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 16px 0 8px;
+}
+
+.brand {
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+/* Prompt bar */
+.promptbar {
+  display: flex;
+  gap: 8px;
+}
+.promptbar input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 14px 16px;
+  font-size: 15px;
+  outline: none;
+}
+.promptbar input:focus { border-color: var(--accent); }
+.promptbar button,
+.runview-tabs button,
+.runner-output button,
+.back {
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+  color: white;
+  font-weight: 600;
+  padding: 14px 20px;
+  cursor: pointer;
+}
+.promptbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Home grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+}
+.tile {
+  position: relative;
+}
+.tile-launch {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.08s ease, border-color 0.15s ease;
+}
+.tile-launch:hover { transform: translateY(-2px); border-color: var(--accent); }
+.tile-icon { font-size: 40px; line-height: 1; }
+.tile-name {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 8px;
+}
+.tile-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+.tile-delete:hover { color: var(--fail); border-color: var(--fail); }
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 60px;
+}
+.empty-title { font-size: 17px; color: var(--text); margin: 0 0 6px; }
+.empty-sub { margin: 0; }
+
+/* Build view */
+.buildview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  gap: 18px;
+}
+.spinner {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  margin-top: 2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.build-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.build-line { color: var(--muted); }
+.build-ok { color: var(--ok); }
+.build-fail { color: var(--fail); }
+.build-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 16px; }
+.build-hint { color: var(--muted); margin: 0; }
+
+/* Run view */
+.runview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.runview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.runview-title { font-weight: 700; flex: 1; }
+.back { background: var(--panel-2); padding: 10px 14px; }
+.runview-tabs { display: flex; gap: 6px; }
+.runview-tabs button {
+  background: var(--panel-2);
+  padding: 10px 16px;
+  font-weight: 500;
+}
+.runview-tabs button.active { background: var(--accent); }
+
+.runner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.runner-stage {
+  flex: 1;
+  /* Definite height so the tool iframe's height:100% resolves (a flex/min-height
+     chain alone leaves the iframe at its 150px default). */
+  height: 70vh;
+  min-height: 420px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.runner-stage iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.runner-error {
+  background: rgba(255, 122, 122, 0.12);
+  border: 1px solid var(--fail);
+  color: var(--fail);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+}
+.runner-output {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.runner-output-label { color: var(--muted); }
+
+/* Source view */
+.source {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.source-tabs { display: flex; gap: 0; background: var(--panel-2); }
+.source-tab {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  padding: 12px 16px;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.source-tab.active { color: var(--text); background: var(--panel); }
+.source-code {
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: var(--panel);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d6d8ea;
+  max-height: 70vh;
+}

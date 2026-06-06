@@ -3,14 +3,16 @@
 // (REQ-GEN-003). This is the spike-level shape of Doc 04 §4.7; auth, quota
 // enforcement (REQ-PAY-003), and persistence are stubbed for the spike.
 
+import "./env.js"; // load root .env before reading any secret
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { generateTool, type GenEvent } from "./generate.js";
-import { anthropicModel } from "./anthropic-model.js";
+import { createModel, activeProviderName } from "./provider.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT = readFileSync(
@@ -20,14 +22,17 @@ const SYSTEM_PROMPT = readFileSync(
 
 const app = new Hono();
 
-app.get("/health", (c) => c.json({ ok: true }));
+// The web shell runs on a different dev origin (Vite); allow it to call us.
+app.use("/v1/*", cors());
+
+app.get("/health", (c) => c.json({ ok: true, provider: activeProviderName() }));
 
 app.post("/v1/generate", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) return c.json({ error: "prompt is required" }, 400);
 
-  const model = anthropicModel();
+  const model = createModel();
 
   return streamSSE(c, async (stream) => {
     const send = (e: GenEvent) =>
