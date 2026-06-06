@@ -1,0 +1,304 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 03 · SYSTEM ARCHITECTURE
+================================================================================
+
+  Maps to NASA "V": SUB-SYSTEM (HIGH-LEVEL DESIGN) + COMPONENT DETAILED DESIGN.
+  Verified by Doc 06. Concrete tools/versions/interfaces are in Doc 04.
+  Status: BASELINE v1.0
+
+--------------------------------------------------------------------------------
+3.1  THE ONE ARCHITECTURAL IDEA THAT MAKES THIS WORK
+--------------------------------------------------------------------------------
+
+SEPARATE GENERATION FROM EXECUTION.
+
+  GENERATION is heavy. It needs strong models, possibly a real filesystem and
+  tools, retries, and validation. It happens on the SERVER.
+
+  EXECUTION is light. A finished tool is a self-contained web bundle that runs
+  inside a WebView on the PHONE, with no server at run time.
+
+Everything below is an elaboration of that split. It is also what resolves the
+"how do we run code on the phone / how do we touch the filesystem" question:
+the phone never runs the build agent and never gets raw filesystem access; it
+runs a finished, validated artifact in a sandbox, and the host (not the tool)
+mediates the few device actions we allow.
+
+--------------------------------------------------------------------------------
+3.2  WHAT A "TOOL/APP" IS, PHYSICALLY
+--------------------------------------------------------------------------------
+
+  An app = a signed bundle:
+     manifest.json   { id, name, icon, version, capabilities[], createdBy,
+                       contentCategory, ageRating }
+     index.html      entry point (self-contained or referencing bundled assets)
+     app.js / app.css (optional, bundled — never fetched at runtime)
+     /assets         (optional, bundled images/fonts)
+
+  Constraints (enforced by validation, CMP-05):
+   - Self-contained: no runtime fetch of additional executable code (compliance,
+     Doc 07 / Apple 2.5.2). Data fetches to allow-listed origins are permitted.
+   - Uses only the Runtime SDK surface (CMP-02) for storage, output, and any
+     allowed capability — never platform-native APIs directly on iOS.
+   - Source fully readable/editable by the owner (Tenet T2; REQ-EDIT-001).
+
+--------------------------------------------------------------------------------
+3.3  COMPONENT INVENTORY
+--------------------------------------------------------------------------------
+
+  ON DEVICE (the thin client)
+   CMP-01  Mobile Host App ........ The shell: home grid, folders, drag/long-
+                                    press, build view, app runner host, source
+                                    editor, onboarding, settings, paywall UI.
+   CMP-02  Runtime + Runtime SDK .. The on-device WebView sandbox plus a small
+                                    injected JS library giving every app a
+                                    consistent surface (storage, UI helpers,
+                                    output channel, capability requests).
+   CMP-07c Egress/Capability Client The on-device half of the network allow-list
+                                    and (Android only) the permissioned device
+                                    capability bridge.
+   CMP-08  Host Chrome Export ..... Native, host-owned Share/Export controls
+                                    (NOT exposed to app code on iOS).
+
+  BACKEND (the heavy lifting)
+   CMP-03  Generation Orchestrator  Classifies a prompt, picks the tier and
+                                    model, runs the Tier-1 repair loop, calls
+                                    validation, returns the bundle (streamed).
+   CMP-04  Model Gateway .......... Holds provider credentials; calls the LLM
+                                    API; manages streaming, prompt caching,
+                                    batch, and per-model routing.
+   CMP-05  Validation/Eval Harness  Loads a candidate bundle in a headless
+                                    runtime that MIRRORS the device runtime;
+                                    runs smoke tests; returns pass/fail + errors
+                                    for the repair loop. Also runs the offline
+                                    regression eval suite (Doc 06).
+   CMP-06  Agentic Build Service .. Tier-2. Runs the Claude Agent SDK inside an
+                                    ephemeral cloud sandbox (real FS + tools +
+                                    headless browser), iterates to green, emits
+                                    a bundle. (Doc 04.)
+   CMP-07s Capability Broker / Egress Server-side policy: the allow-list of
+                                    origins a given app may reach; logging.
+   CMP-09  Entitlements & Billing .. Source of truth for quota/credits; validates
+                                    IAP receipts; consumes store server
+                                    notifications (renew/cancel/refund).
+   CMP-10  Identity / Auth ......... Sign in with Apple / Google / email;
+                                    issues session tokens.
+   CMP-11  Sync & Storage .......... Encrypted storage and cross-device sync of
+                                    bundles, metadata, and opted-in app data.
+   CMP-12  Manifest & Moderation ... Maintains the content manifest required for
+                                    iOS review (Apple 4.7.4); ingests user
+                                    abuse reports; runs prompt/output safety
+                                    checks (Doc 07).
+   CMP-13  Observability & Admin ... Metrics, logs, traces, dashboards, feature
+                                    flags, and an internal admin console.
+
+--------------------------------------------------------------------------------
+3.4  DATA FLOW — TIER-1 GENERATION (the common case)
+--------------------------------------------------------------------------------
+
+  PHONE                         BACKEND                           LLM PROVIDER
+  -----                         -------                           ------------
+  [User types prompt]
+        |  prompt + session     
+        v                       
+   CMP-01  --------------->  CMP-03 Orchestrator
+                                |  1. safety/scope check (CMP-12)
+                                |  2. classify -> choose model (CMP-04)
+                                |  3. build request w/ cached system prompt
+                                |        + Runtime SDK reference
+                                |------------------------------------>  LLM
+                                |     <-- streamed candidate bundle ----
+                                |  4. CMP-05 validate in headless runtime
+                                |        - loads? smoke test passes?
+                                |        - NO -> feed error back (<=N turns) -+
+                                |        - YES -> sign + package              |
+                                |  <----------------------------------------+
+        <----- streamed preview + final bundle -----
+        |
+   [Live preview in build view] -- user pokes it
+        |
+   [User taps "Keep"] -> CMP-01 persists bundle locally (+ queue sync CMP-11)
+        |
+   [Icon animates onto home grid]
+
+  Notes:
+   - The big static prefix (system prompt + SDK docs + examples) is sent with
+     PROMPT CACHING so repeated generations are cheap (Doc 04, Doc 08).
+   - The repair loop is BOUNDED (default 3 turns) and gated by the validator's
+     concrete pass/fail — not by the model's self-assessment. This is the
+     reliability backbone (REQ-GEN-002).
+
+--------------------------------------------------------------------------------
+3.5  DATA FLOW — TIER-2 AGENTIC BUILD (hard tools)
+--------------------------------------------------------------------------------
+
+   CMP-03 decides Tier-1 is unlikely to succeed (by request class, or after a
+   failed Tier-1 attempt) and escalates:
+
+   CMP-03 --> CMP-06 Agentic Build Service
+                |  spin up ephemeral sandbox (real FS, shell, headless browser)
+                |  seed it with: target spec, Runtime SDK stub, example apps,
+                |                a generated acceptance test
+                |  run Claude Agent SDK loop:
+                |     gather context -> write files -> run -> read errors ->
+                |     fix -> re-run -> ... until acceptance test passes OR
+                |     iteration/cost ceiling hit
+                |  on success: export bundle -> CMP-05 final validation -> sign
+                |  on ceiling:  return best partial + honest "reduced scope" path
+                v
+   bundle streamed to phone as in 3.4
+
+   The "one VM per app" idea belongs HERE — at BUILD time, on the server —
+   not at run time on the phone. Sandboxes are ephemeral and per-build.
+
+--------------------------------------------------------------------------------
+3.6  DATA FLOW — RUNTIME EXECUTION + EXPORT (on device, offline-capable)
+--------------------------------------------------------------------------------
+
+   [User taps icon]
+        v
+   CMP-01 loads bundle into CMP-02 (WebView sandbox)
+        |  Runtime SDK injected; app gets:
+        |     WC.storage (scoped KV)     WC.ui (helpers)
+        |     WC.output(...)  (hands a result to the host)
+        |     WC.capabilities.* (allowed set only; platform-dependent)
+        v
+   [App runs entirely on-device]  --- needs no server unless it calls an
+                                      allow-listed data API (CMP-07 enforces)
+        |
+   App calls WC.output(result)  ----> host displays result + a host-owned
+                                      "Share / Export" affordance (CMP-08)
+        |
+   [User taps host's Export] -> native share sheet -> Files / Messages / etc.
+
+   KEY COMPLIANCE POINT (Apple 4.7.2, REQ-RUN-004): the SHARE/EXPORT action is
+   initiated by the HOST'S native chrome, reading the result the app passed up
+   via WC.output. The app's own code never calls a native share/file API on iOS.
+   On Android, CMP-07c may expose richer capability calls behind per-use consent
+   (REQ-RUN-006).
+
+--------------------------------------------------------------------------------
+3.7  DATA MODEL (logical)
+--------------------------------------------------------------------------------
+
+  User
+    id, auth_provider, created_at, plan, account_status
+
+  Device
+    id, user_id, platform(ios|android|web), push_token?, last_seen
+
+  App
+    id, owner_user_id, name, icon_ref, content_category, age_rating,
+    created_by(tier1|tier2|import), created_at, current_version_id
+
+  AppVersion
+    id, app_id, version_no, bundle_ref(hash), source_prompt?, diff_summary?,
+    validation_status, created_at        (history enables revert — REQ-GEN-006)
+
+  AppData            (per-app scoped storage; opt-in to sync)
+    app_id, key, value(blob, encrypted), updated_at
+
+  Entitlement        (server source of truth — REQ-PAY-003)
+    user_id, plan, tier1_quota_remaining, tier2_credits_remaining,
+    period_start, period_end, store_txn_refs[]
+
+  GenerationJob
+    id, user_id, prompt_redacted, tier, model, status, repair_turns,
+    input_tokens, output_tokens, cost_estimate, success, duration_ms
+                                            (feeds Doc 08 cost & success KPIs)
+
+  Report             (moderation — REQ-PRIV-002)
+    id, reporter_user_id, app_id|output_ref, reason, status, created_at
+
+  ManifestEntry      (Apple 4.7.4 — CMP-12)
+    app_id is NOT listed (apps are private to a user); the manifest covers the
+    HOST's own software inventory and the templated example tools we ship.
+    See Doc 07 for how a private-tools model maps to the manifest requirement.
+
+--------------------------------------------------------------------------------
+3.8  SECURITY MODEL
+--------------------------------------------------------------------------------
+
+  TRUST BOUNDARIES
+    1. User <-> Host app: standard mobile trust.
+    2. Host app <-> Generated app (WebView): UNTRUSTED. Treat every generated
+       app as potentially buggy or adversarial. Isolation is mandatory.
+    3. Host app <-> Backend: authenticated session; backend is the policy and
+       entitlement authority.
+    4. Backend <-> LLM provider: server-held credentials only.
+
+  KEY HANDLING (REQ-SEC-001)
+    - No provider API key in the client or in any bundle. Ever. All model calls
+      go through CMP-04. The client authenticates to OUR backend; the backend
+      authenticates to the provider. This is also what enables metering/billing.
+
+  GENERATED-CODE CONTAINMENT (REQ-SEC-002, REQ-RUN-002/005)
+    - Each app runs in its own WebView context with a strict Content Security
+      Policy. No shared globals, no access to sibling apps' storage.
+    - Network egress is DENY-BY-DEFAULT. The Egress Broker (CMP-07) enforces an
+      allow-list per app (e.g. a weather tool may reach only the weather API).
+      Requests to other origins are blocked and logged.
+    - iOS: no custom native bridge exposed to app code (Apple 4.7.2).
+      Android: optional bridge, every privileged call behind explicit per-use
+      consent and audit (REQ-RUN-006).
+
+  INJECTION DEFENSE (REQ-SEC-005)
+    - Imported code and any fetched data are data, not instructions. They cannot
+      change the host's behavior or widen capability. The Runtime SDK surface is
+      fixed at build time of the HOST, not negotiable by app content.
+
+  SERVER-SIDE ABUSE CONTROL (REQ-SEC-003, REQ-NFR-006)
+    - Per-user rate limits and hard cost ceilings on generation. Anomaly
+      detection on token spend. Safety pre-screen on prompts and post-screen on
+      outputs (CMP-12) against disallowed categories (Doc 07).
+
+  DATA PROTECTION (REQ-SEC-004, REQ-DATA-003)
+    - TLS everywhere. Encryption at rest for stored bundles and app data.
+      User-initiated full export and delete (REQ-DATA-004).
+
+--------------------------------------------------------------------------------
+3.9  PLATFORM DIVERGENCE (the heart of the compliance design)
+--------------------------------------------------------------------------------
+
+  Capability                      | iOS (App Store)        | Android (Play)
+  --------------------------------+------------------------+--------------------
+  Run generated HTML/JS in WebView| YES (WebKit/JSCore)    | YES (WebView)
+  Source viewable/editable by user| YES (required posture) | YES
+  App's own code calls native API | NO  (4.7.2 forbids)    | LIMITED, w/ consent
+  Save/share output               | HOST chrome only       | Host or bridge
+  Read user-picked file (import)  | via host file picker   | via host/bridge
+  Location / camera to app code   | NO                     | OPTIONAL (consent)
+  Local notifications from app    | NO (host may, app no)  | OPTIONAL (consent)
+  Arbitrary network from app code | NO (allow-list only)   | Allow-list only
+
+  Consequence for product: the iOS build is the "least-capable" target and
+  therefore defines the baseline tool catalog. Anything that needs more than
+  the iOS baseline is either (a) Android-only and clearly labeled, or (b) done
+  through host chrome. Design and copy must never promise a capability the
+  current platform can't deliver (Tenet T1/T4).
+
+--------------------------------------------------------------------------------
+3.10  WHY NOT THE ALTERNATIVES (so the team doesn't relitigate)
+--------------------------------------------------------------------------------
+
+  "Run a VM per app on the phone."  Not feasible/needed. iOS forbids arbitrary
+     native execution; a per-app VM at runtime is heavy and pointless when a
+     WebView sandbox already isolates apps. The per-build sandbox (Tier-2) gives
+     us the "VM" benefit where it actually helps: at generation time.
+
+  "Generate native (Swift/Kotlin) apps."  Prohibited to install/execute at
+     runtime (Apple 2.5.2; platform protections). Web bundles are the legal,
+     model-friendly, cross-platform primitive.
+
+  "Let generated code touch the iOS filesystem directly."  Not allowed and not
+     safe. The Runtime SDK + host-owned export gives users files OUT without
+     ever exposing the filesystem to untrusted code.
+
+  "Bundle a Python interpreter so tools can be Python."  Possible (others do it)
+     but adds weight, library limits, and more store risk for little gain over
+     web tech, which already covers the in-scope catalog (Doc 01 §6). Defer.
+
+================================================================================
+  END OF DOCUMENT 03
+================================================================================

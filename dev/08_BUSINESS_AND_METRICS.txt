@@ -1,0 +1,158 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 08 · BUSINESS MODEL, UNIT ECONOMICS & METRICS
+================================================================================
+
+  Maps to NASA "V": part of the COMMISSIONED SYSTEM (operations) — how the system
+  sustains itself. Status: BASELINE v1.0
+
+  All cost figures derive from model prices in Doc 04, current to mid-2026 and
+  to be re-verified (OQ-03). Treat as a working model to keep updated, not gospel.
+
+--------------------------------------------------------------------------------
+8.1  THE GOAL, STATED HONESTLY
+--------------------------------------------------------------------------------
+
+  The sponsor's stated goal is modest and specific: a couple thousand dollars of
+  revenue, ideally as consistent MRR — not a venture-scale outcome. That goal is
+  ACHIEVABLE and it should discipline every decision: keep COGS low, keep the
+  build lean (Doc 05 §5.6), and charge a simple subscription. A few hundred happy
+  paying users clears the bar.
+
+--------------------------------------------------------------------------------
+8.2  MONETIZATION MODEL
+--------------------------------------------------------------------------------
+
+  Subscription with a generous free tier. Simple, one paid plan to start.
+
+    FREE
+      - A metered number of Tier-1 generations per month (e.g. 10-15).
+      - Default to the cheap/standard models; no Tier-2 agentic builds.
+      - Unlimited RUNNING of tools already created (running is ~free to us).
+      - Purpose: deliver the first-session "wow" with zero friction and let the
+        tools the user already made keep working forever.
+
+    PRO  (~US$9.99 / month; offer an annual price at a discount)
+      - Generous Tier-1 quota (e.g. ~200/mo) + a monthly bundle of Tier-2
+        "build credits" (e.g. ~20) for hard tools.
+      - Cross-device sync, source editing niceties, priority generation.
+      - Hard per-period ceiling on credits to cap our cost tail (REQ-NFR-006).
+
+    OPTIONAL later: a credit top-up pack for power users; a higher "Studio" tier.
+    Keep the menu tiny at launch (Tenet T6).
+
+--------------------------------------------------------------------------------
+8.3  UNIT ECONOMICS — COST PER GENERATION (the core of COGS)
+--------------------------------------------------------------------------------
+
+  Assumptions per Tier-1 generation: a large STATIC prefix (system prompt +
+  Runtime SDK reference + few-shot) served via PROMPT CACHING, a small dynamic
+  user prompt, and a generated bundle as output. Illustrative token shape:
+  ~1k fresh input + ~5k cached input + ~10k output, plus 0-2 repair turns.
+
+    Per Tier-1 generation (single pass), by model:
+      Haiku  (~$1/$5)  : ~ $0.06 - $0.10
+      Sonnet (~$3/$15) : ~ $0.15 - $0.20     <- default workhorse
+      Opus   (~$5/$25) : ~ $0.30 - $0.45
+    With repair turns, add roughly 30-80% to the above.
+
+    Why caching matters: cached input bills at up to ~90% off, so the big static
+    prefix is nearly free on repeat calls. Without caching, Tier-1 cost can be
+    several times higher. Caching is the #1 COGS lever (Doc 04 §4.2).
+
+    Per Tier-2 agentic build (many turns, tools, iterations): the cost driver.
+      Sonnet-driven : ~ $1 - $5 per build (typical)
+      Opus-driven   : ~ $5 - $15+ per build (hard cases)
+    This is why Tier-2 is metered as credits and reserved for paid users, with a
+    hard ceiling. The Batch API (50% off) is used for our internal eval runs, not
+    for live generation.
+
+  Defensive design: server-side quotas + hard cost ceilings per user per period
+  (REQ-PAY-003, REQ-NFR-006) make worst-case COGS BOUNDED and known. No single
+  user can run up an unbounded bill.
+
+--------------------------------------------------------------------------------
+8.4  MARGIN & BREAK-EVEN
+--------------------------------------------------------------------------------
+
+  Store commission: Apple/Google take 15% under their small-business / first-band
+  programs (enroll — Doc 07). So a $9.99 sub nets ~$8.49 to us.
+
+  COGS per Pro user/month is usage-dependent. The median Pro user (a handful of
+  Tier-1 gens + occasional Tier-2) costs us a low single-digit dollar amount;
+  the credit ceiling caps the heavy tail. Target blended GROSS MARGIN >= 70%
+  (i.e. keep average COGS under ~$2.50/sub) via caching, model routing, and caps.
+
+    Couple-thousand-MRR target:
+      ~250-350 paying subscribers at $9.99
+        ~= $2,500 - $3,500 gross MRR
+        ~= $2,100 - $3,000 net after the 15% store fee
+        minus model COGS and fixed infra -> the stated goal, comfortably.
+
+  Fixed costs at this scale are small: managed Postgres/Redis, object storage,
+  a few backend containers, the sandbox pool (Tier-2), and observability — on the
+  order of low-hundreds of dollars/month until volume grows. The dominant
+  variable cost is model tokens, which the design keeps bounded.
+
+--------------------------------------------------------------------------------
+8.5  METRICS — NORTH STAR & KPIs (instrumented per REQ-NFR-003)
+--------------------------------------------------------------------------------
+
+  NORTH-STAR METRIC (NSM):
+    Number of tools CREATED and then USED >= 3 times, per active user per month.
+    Rationale: it rewards real, durable utility (a tool someone keeps using),
+    not vanity generation. If this rises, the product is genuinely useful.
+
+  ACQUISITION / ACTIVATION
+    - Activation rate: % of new users who create AND run their first WORKING
+      tool within the first session.            Target >= 60%.
+    - Time-to-first-working-tool.                Target: under ~2 minutes.
+
+  QUALITY (the trust engine)
+    - Tier-1 first-try success (runs, core function works).  Target >= 85%.
+    - Tier-2 success on hard requests.                       Track; improve.
+    - Repair-loop resolution rate (failures fixed within N turns).
+    - p50 / p90 generation latency (Tier-1).   Targets p50<=20s, p90<=45s.
+    - Crash-free sessions.                       Target >= 99.5%.
+
+  RETENTION / ENGAGEMENT
+    - D1 / D7 / D30 retention.
+    - Tools created per active user; tools RUN per active user (the latter is
+      the stickiness signal).
+    - WAU / MAU ratio.
+
+  MONETIZATION
+    - Free -> Paid conversion.                  Target 3-6%.
+    - MRR, net MRR after store fee.
+    - Monthly churn.                             Target < 5%.
+    - ARPU / ARPPU.
+    - Gross margin after COGS + store fee.       Target >= 70%.
+
+  COST GUARDRAILS (watch like a hawk)
+    - Cost per SUCCESSFUL generation (by tier/model).
+    - Token COGS per active user / per paying user.
+    - % of generations served from prompt cache.
+    - Tier-2 spend as a share of revenue.
+
+--------------------------------------------------------------------------------
+8.6  GROWTH (low-cost, fitting the modest goal)
+--------------------------------------------------------------------------------
+
+  - Word of mouth via the Tinkerer persona (P2): the people who push the product
+    are the ones who tell others. Make sharing the OUTPUT of a tool delightful
+    (a generated list, plan, image) with a light "made with Wild Card" tag — a
+    growth loop that does NOT require sharing the tool itself (which stays out of
+    scope and avoids store risk — Doc 01 §7, Doc 07 C4).
+  - Web/PWA as top-of-funnel: the web channel (Doc 07 §7.5) is both a fast first
+    revenue channel and a discoverable, linkable surface for SEO and demos.
+  - ASO: target intent like "make your own app / tool / tracker." Use the
+    templated example tools as landing pages.
+  - Content: short clips of "I described X and got a working tool" are the
+    product's natural, honest marketing. The demo IS the pitch.
+
+  Keep paid acquisition off until unit economics (8.3-8.4) are proven; at this
+  revenue goal, organic + word of mouth is the right engine.
+
+================================================================================
+  END OF DOCUMENT 08
+================================================================================

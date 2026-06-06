@@ -1,0 +1,157 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 00 · MASTER INDEX & PROGRAM CONTROL
+================================================================================
+
+  Program:        Wild Card (working title)
+  One-line:       Describe a tool out loud; get a working tool on your phone.
+  Document set:   10 documents (this is the index)
+  Status:         BASELINE v1.0 — issued for execution
+  Audience:       Project Manager + engineering, design, QA, and release teams
+  Owner:          <Product Owner / Founder>
+  Last updated:   2026-06-03
+
+--------------------------------------------------------------------------------
+0.1  HOW TO READ THIS BIBLE
+--------------------------------------------------------------------------------
+
+This is a build-to-spec package modeled on the NASA systems-engineering "V"
+framework. The left side of the V defines and decomposes the system (vision ->
+requirements -> architecture -> components). The bottom is implementation. The
+right side verifies and validates each level back up against the specs that
+created it. Traceability runs through the whole thing: every test exists to
+prove a requirement, and every requirement exists to serve the vision.
+
+You do not need to read all ten documents to start. Read in this order:
+
+   1. Doc 01 (Vision / ConOps)      — what we are building and why. 20 min.
+   2. Doc 02 (Requirements)         — the contract. What "done" means.
+   3. Doc 03 (Architecture)         — how the system is shaped.
+   4. Doc 05 (Implementation Plan)  — sequence, estimates, team, timeline.
+
+Then 04 (interfaces), 06 (V&V), 07 (store approval), 08 (business), 09 (risk)
+as each becomes relevant to the phase you are in.
+
+--------------------------------------------------------------------------------
+0.2  THE DOCUMENT SET
+--------------------------------------------------------------------------------
+
+  00  MASTER_INDEX .............. This file. Navigation, control, glossary.
+  01  PRODUCT_VISION_CONOPS ..... Vision, design tenets, users, journeys, scope.
+  02  REQUIREMENTS .............. Functional + non-functional reqs with IDs.
+  03  SYSTEM_ARCHITECTURE ....... Components, data flow, data model, security.
+  04  TECH_STACK_AND_INTERFACES . Concrete stack, the generation engine, APIs.
+  05  IMPLEMENTATION_PLAN ....... WBS, LOC estimates, team, timeline, milestones.
+  06  VERIFICATION_VALIDATION ... Test strategy, the generation eval harness, DoD.
+  07  STORE_APPROVAL ............ Apple + Google approval paths and compliance.
+  08  BUSINESS_AND_METRICS ...... Monetization, unit economics, KPIs.
+  09  RISK_REGISTER ............. Ranked risks, mitigations, owners.
+
+--------------------------------------------------------------------------------
+0.3  THE "V" MAPPING (how our docs trace to the NASA framework)
+--------------------------------------------------------------------------------
+
+   DEFINITION & DECOMPOSITION                    INTEGRATION & VERIFICATION
+   (left side, top-down)                         (right side, bottom-up)
+
+   Doc 01  Concept of Operations  <----------->  Doc 06  System Validation
+            (what users need)        validation   (does it serve the need?)
+        \                            plan                              /
+         \  Doc 02  System Reqs    <---------->  Doc 06  System Verif. /
+          \      (the contract)     verif. plan   (did we meet reqs?) /
+           \                                                         /
+            \ Doc 03/04  Subsystem <-------->  Doc 06  Subsystem    /
+             \   & Component Design  verif.      & Component Verif./
+              \      (how it works)  procedure   (does each part   /
+               \                                  do its job?)    /
+                \                                                /
+                 \------>  Doc 05  IMPLEMENTATION  <------------/
+                              (coding & test)
+                              TRACEABILITY runs through all levels
+
+   Traceability rule: Requirement IDs (Doc 02) appear in Architecture (Doc 03),
+   in the Implementation WBS (Doc 05), and in the Test cases (Doc 06). Nothing
+   gets built that does not trace to a requirement; nothing ships unverified.
+
+--------------------------------------------------------------------------------
+0.4  IDENTIFIER SCHEMES (used across all documents)
+--------------------------------------------------------------------------------
+
+  Requirements:   REQ-<AREA>-<NNN>      e.g. REQ-GEN-014
+                  AREAS: GEN (generation), RUN (runtime/execution),
+                  HOME (home screen/library), EDIT (code/source), DATA (storage
+                  & sync), ACCT (accounts/auth), PAY (billing), SEC (security),
+                  PRIV (privacy/compliance), NFR (non-functional), PLT (platform).
+
+  Components:     CMP-<NN>              e.g. CMP-03 (Generation Orchestrator)
+  Test cases:     TC-<AREA>-<NNN>       e.g. TC-RUN-007
+  Risks:          RSK-<NN>              e.g. RSK-01
+  Milestones:     M<N>                  e.g. M3
+  Open questions: OQ-<NN>               e.g. OQ-05
+
+--------------------------------------------------------------------------------
+0.5  GLOSSARY
+--------------------------------------------------------------------------------
+
+  App (Wild Card "app")  A user-owned mini-tool: a self-contained HTML/CSS/JS
+                         bundle plus metadata (name, icon, version). NOT a
+                         native binary. Runs inside a WebView on the device.
+
+  Generation            The act of turning a natural-language prompt into a
+                        working app bundle. Happens on the server. Two tiers
+                        (single-call and agentic).
+
+  Execution / Runtime   Running a finished app on the user's phone, inside a
+                        WebView (WebKit on iOS, WebView/Chromium on Android).
+                        No server involved at run time.
+
+  Tier-1 generation     One strong model call plus a bounded self-repair loop.
+                        Covers the large majority of requests. Fast, cheap.
+
+  Tier-2 generation     A server-side agentic build (Claude Agent SDK in a
+                        cloud sandbox) that iterates until tests pass. For hard
+                        or multi-file apps. Slower, metered.
+
+  Bridge / Capability   A controlled channel that lets app code request a device
+                        capability (save a file, read location). On iOS this is
+                        DELIBERATELY MINIMAL for App Store compliance (see Doc 07);
+                        on Android it can be richer.
+
+  Runtime SDK           A small JavaScript library injected into every app so it
+                        has a consistent, documented surface (storage, UI helpers,
+                        a way to surface output to the host). See Doc 04.
+
+  Eval harness          Automated checks that load a freshly generated app in a
+                        headless browser and confirm it runs before it reaches
+                        the user. The single most important quality system.
+
+  ConOps                Concept of Operations (Doc 01). The human-level story of
+                        what the system does and for whom.
+
+  V&V                   Verification (did we build it right?) and Validation
+                        (did we build the right thing?). Doc 06.
+
+  MRR / COGS / ARPU     Monthly recurring revenue / cost of goods sold (here,
+                        mostly LLM tokens + store fees) / average revenue per user.
+
+--------------------------------------------------------------------------------
+0.6  DOCUMENT CONTROL
+--------------------------------------------------------------------------------
+
+  Change control:  Any change to a baselined requirement (Doc 02) requires a
+                   one-line entry in the change log of that document and a note
+                   of which test cases and components are affected. Architecture
+                   changes that alter an interface (Doc 04) require sign-off from
+                   the mobile lead and backend lead.
+
+  Source of truth: When documents disagree, precedence is:
+                   Doc 02 (Requirements) > Doc 03 (Architecture) > everything else.
+                   The Vision (Doc 01) governs intent but is not itself testable.
+
+  Estimates note:  All line-of-code (LOC) and time numbers in this bible are
+                   engineering estimates with stated assumptions, not commitments.
+                   They exist for planning and staffing. Re-baseline after Phase 0.
+
+================================================================================
+  END OF DOCUMENT 00
+================================================================================

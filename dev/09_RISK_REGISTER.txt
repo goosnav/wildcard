@@ -1,0 +1,141 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 09 · RISK REGISTER & OPEN QUESTIONS
+================================================================================
+
+  Living document. Review at every milestone (Doc 05). Status: BASELINE v1.0
+
+  Likelihood (L) / Impact (I): Low / Med / High. Exposure = L x I, ranked.
+  Each risk has a mitigation, an owner, and an early-warning trigger.
+
+--------------------------------------------------------------------------------
+9.1  RANKED RISKS
+--------------------------------------------------------------------------------
+
+  RSK-01  APP STORE REJECTION / POLICY SHIFT (EXISTENTIAL)         L:High I:High
+    The category Wild Card lives in is exactly what Apple tightened and began
+    enforcing in 2025-2026 (Doc 07 §7.1). A rejection, or a future guideline
+    change, can block or kill distribution.
+    Mitigation: the compliant posture (Doc 07 §7.2) is baked into the
+    ARCHITECTURE (Doc 03), not bolted on; Phase 0 submission spike (M0) tests it
+    before heavy spend; web/PWA fallback channel needs no review; Android can
+    lead; standing policy change-watch (Doc 07 §7.7).
+    Owner: PM.  Trigger: any reviewer rejection; any guideline update touching
+    2.5.2 / 4.7.x or Play AI policy.
+
+  RSK-02  GENERATION QUALITY TOO LOW (tools don't "just work")     L:Med  I:High
+    If first-try success sits below ~85%, trust collapses and the magic dies.
+    Mitigation: validator-gated delivery (never ship a broken tool, REQ-GEN-002);
+    bounded repair loop; Tier-2 for hard cases; the >=200-prompt eval harness as
+    a CI gate (Doc 06 §6.2); every real failure becomes a permanent eval case.
+    Owner: Backend/AI lead.  Trigger: eval success or live success-rate dips.
+
+  RSK-03  RUNAWAY MODEL COST / THIN MARGIN                          L:Med  I:High
+    Token spend (esp. Tier-2) erodes the modest margin the business needs.
+    Mitigation: prompt caching; cheapest-model routing; Tier-2 as metered credits
+    with HARD per-user ceilings (REQ-NFR-006); cost dashboards + alerts (Doc 08
+    §8.5); Batch API for internal evals only.
+    Owner: Backend/AI lead.  Trigger: cost-per-successful-gen or COGS/sub rising.
+
+  RSK-04  SECURITY: GENERATED CODE EXFILTRATES OR ESCALATES         L:Med  I:High
+    Untrusted generated/imported code could try to leak data or reach the host.
+    Mitigation: per-app sandbox + strict CSP; deny-by-default egress allow-list
+    (REQ-RUN-005); no native bridge on iOS (4.7.2); fixed Runtime SDK surface;
+    pre-launch pentest (Doc 05).
+    Owner: Mobile lead + security firm.  Trigger: any isolation/egress test fail.
+
+  RSK-05  PROMPT INJECTION VIA IMPORTS / FETCHED DATA               L:Med  I:Med
+    Malicious content tries to redirect generation or runtime behavior.
+    Mitigation: treat all imported code/fetched data as data, never instructions
+    (REQ-SEC-005); capability surface not negotiable by content; output safety
+    screening (CMP-12).
+    Owner: Backend/AI lead.  Trigger: red-team escalation success in evals.
+
+  RSK-06  MODEL-PROVIDER DEPENDENCY (pricing / availability / terms) L:Med  I:Med
+    Single-provider reliance on pricing, uptime, rate limits, and commercial
+    terms (OQ-04).
+    Mitigation: isolate provider behind the Model Gateway (CMP-04) so a model or
+    even provider can be swapped; cache aggressively; confirm commercial-terms +
+    API-key auth at start; keep an alternative-model evaluation on the shelf.
+    Owner: Backend/AI lead.  Trigger: price change, rate-limit pressure, outage.
+
+  RSK-07  SCOPE CREEP -> "SLOP"                                      L:High I:Med
+    Pressure to add sharing, marketplace, teams, plug-ins dilutes the product,
+    raises store risk, and blows the lean budget (Doc 01 §7).
+    Mitigation: the design tenets (Doc 01 §3) and the non-goals are the defense;
+    PM guards the one-sentence vision; new scope must pass "does it serve the one
+    sentence AND is it store-safe?"
+    Owner: PM.  Trigger: roadmap items outside Doc 01 scope.
+
+  RSK-08  WEAK DEMAND / RETENTION                                    L:Med  I:High
+    People try it once and don't return; the NSM stays flat.
+    Mitigation: ship the lean revenue-first slice FIRST (Doc 05 §5.6) to test
+    demand cheaply; instrument activation + retention from day one; let real
+    usage steer the tool catalog; web channel to test funnel before big spend.
+    Owner: PM.  Trigger: low activation or D7/D30 retention in beta.
+
+  RSK-09  MODERATION / SAFETY FAILURE                                L:Low  I:High
+    A user coaxes the generator into prohibited content; store policy violated.
+    Mitigation: input + output safety screening (CMP-12); refusal-with-
+    alternative (REQ-GEN-007); in-app reporting feeding moderation (REQ-PRIV-002);
+    100% refusal on the disallowed eval subset as a release gate (Doc 06 §6.5 G1).
+    Owner: Backend/AI lead + PM.  Trigger: any prohibited output observed/reported.
+
+  RSK-10  SYNC / DATA LOSS                                           L:Low  I:Med
+    A sync bug loses a user's tools or data — a trust killer (Tenet T5).
+    Mitigation: local-first (the device is the source of truth; REQ-DATA-001);
+    last-write-wins with surfaced conflicts; user-initiated export (REQ-DATA-004);
+    server backups.
+    Owner: Backend lead.  Trigger: any reported data loss; conflict-rate spike.
+
+  RSK-11  PLATFORM CAPABILITY MISMATCH (iOS promises it can't keep)  L:Med  I:Med
+    Marketing/UX implies a capability the iOS sandbox can't deliver (4.7.2),
+    causing disappointment or rejection.
+    Mitigation: iOS baseline defines the catalog (Doc 03 §3.9); copy never
+    promises beyond the platform; Android-only capabilities clearly labeled.
+    Owner: PM + design.  Trigger: capability-dependent feature lacking iOS path.
+
+  RSK-12  KEY-PERSON / SMALL-TEAM CONCENTRATION                      L:Med  I:Med
+    A 2-6 person team has bus-factor and burnout risk on a long build.
+    Mitigation: stage the work (Doc 05 §5.6) so value ships in months not years;
+    document interfaces (Doc 04); keep the surface small (Tenet T6).
+    Owner: PM.  Trigger: timeline slippage; single-owner critical components.
+
+  PRIORITY ORDER (by exposure): RSK-01 > RSK-02 > RSK-03 > RSK-08 > RSK-04 >
+  RSK-09 > RSK-07 > RSK-06 > RSK-11 > RSK-05 > RSK-12 > RSK-10.
+
+--------------------------------------------------------------------------------
+9.2  OPEN QUESTIONS LOG (resolve early; each has an owner)
+--------------------------------------------------------------------------------
+
+  OQ-01  Trademark + App Store/Play name-collision check on "Wild Card";
+         choose final name with a fallback ready.                    Owner: PM.
+  OQ-02  Legal/privacy review: Privacy Policy + ToS; EU AI Act transparency;
+         applicable US state AI-disclosure laws; data-retention policy for
+         prompts and generated content; AI-provider processor terms. Owner: PM +
+         counsel.
+  OQ-03  Re-verify current model prices and IDs (Doc 04/08) and recompute unit
+         economics before launch.                                    Owner:
+         Backend/AI lead.
+  OQ-04  Confirm the AI provider's COMMERCIAL terms for powering an end-user
+         product and that API-key (not consumer-login) auth is used for the
+         agentic build path.                                         Owner:
+         Backend/AI lead + PM.
+  OQ-05  Re-read the LIVE Apple App Review Guidelines (esp. 2.5.2, 4.7.x) and
+         Google Play AI/policy pages within 7 days of each submission; re-run the
+         Doc 07 §7.6 checklist.                                      Owner: PM.
+
+--------------------------------------------------------------------------------
+9.3  RISK CADENCE
+--------------------------------------------------------------------------------
+
+  - At each milestone (M0-M5): re-score every risk; close mitigated ones; add new
+    ones discovered.
+  - RSK-01 specifically is reviewed before EVERY store submission and whenever a
+    policy change-watch alert fires.
+  - New production incidents and eval failures feed back into this register and
+    into the eval corpus (Doc 06 §6.7).
+
+================================================================================
+  END OF DOCUMENT 09  —  END OF THE WILD CARD APP BIBLE
+================================================================================

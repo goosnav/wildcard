@@ -1,2 +1,42 @@
-# Google App Engine generated folder
+# ---- Dependencies ----
+node_modules/
+.pnp/
+.pnp.*
+
+# ---- Build output ----
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ---- Test / tooling artifacts ----
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.playwright/
+.vitest/
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Environment / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- Misc ----
 appengine-generated/
+*.local

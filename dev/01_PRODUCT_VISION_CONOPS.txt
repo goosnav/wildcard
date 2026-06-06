@@ -1,0 +1,207 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 01 · PRODUCT VISION & CONCEPT OF OPERATIONS (ConOps)
+================================================================================
+
+  Maps to NASA "V": CONCEPT OF OPERATIONS (top-left). Validated by Doc 06.
+  Status: BASELINE v1.0
+
+--------------------------------------------------------------------------------
+1.  THE ONE SENTENCE
+--------------------------------------------------------------------------------
+
+  You describe a tool you wish you had, and a few seconds later it is sitting
+  on your home screen, working, yours to keep.
+
+If a feature does not serve that sentence, it does not go in version 1. This is
+the discipline that keeps the product from becoming slop.
+
+--------------------------------------------------------------------------------
+2.  THE PROBLEM, STATED PLAINLY
+--------------------------------------------------------------------------------
+
+Most people cannot build software, and most software is built for everyone
+instead of for one person. So everyone carries phones full of apps that almost
+fit, and spends time working around the gaps. Meanwhile, the cost of producing
+a small, single-purpose tool has collapsed: a capable model can now write a
+working mini-app from a sentence. The capability exists; ordinary people just
+have no front door to it.
+
+Wild Card is the front door. It is not a coding tool that happens to be easy.
+It is a tool-making appliance that happens to use code underneath, where the
+code is something the user never has to see unless they want to.
+
+--------------------------------------------------------------------------------
+3.  DESIGN TENETS (the Jobs-level bar)
+--------------------------------------------------------------------------------
+
+These are non-negotiable. They are how we decide arguments.
+
+  T1. ONE GESTURE TO MAGIC.
+      From the moment the app opens, getting a working tool is one action:
+      type (or speak) what you want, then watch it appear. No setup, no
+      project wizard, no account wall in front of the first win.
+
+  T2. THE CODE IS BACKSTAGE, NOT HIDDEN.
+      A normal user never sees code. A curious user can pull back the curtain
+      with one tap and read or edit it. We never force code on anyone, and we
+      never lock anyone out of it. (This dual stance is also what keeps us
+      compliant with app-store rules — see Doc 07.)
+
+  T3. IT LOOKS AND FEELS LIKE THE PHONE.
+      The home screen is a grid of icons with a prompt at the bottom. Long-press
+      to rearrange, drag into folders, delete. Familiar on purpose. The user
+      should feel like they got a superpower, not a new piece of software to
+      learn.
+
+  T4. IT WORKS THE FIRST TIME, OR IT SAYS SO HONESTLY.
+      We do not ship a generated app to a user until our own system has run it
+      and confirmed it works (Doc 06). When something can't be built, we say so
+      in plain language and offer a smaller version, rather than handing over a
+      broken icon.
+
+  T5. THE USER OWNS THEIR TOOLS.
+      Apps are personal property. They live on the device, they can be exported,
+      and deleting the account does not hold them hostage. No tool the user made
+      is ever shown to anyone else without an explicit, deliberate act by them.
+
+  T6. SMALL SURFACE, DEEP CAPABILITY.
+      The visible product is tiny: a grid, a prompt, a runner, a source view.
+      Almost all of our engineering goes into making the thing behind the prompt
+      reliable, not into adding screens.
+
+--------------------------------------------------------------------------------
+4.  WHO IT IS FOR (PERSONAS)
+--------------------------------------------------------------------------------
+
+  P1 — "THE WORKAROUND-ER" (primary). Non-technical. Has three half-broken
+       systems made of Notes, screenshots, and a calculator app. Wants: a tip
+       splitter that works the way her friend group actually splits; a packing
+       list that remembers her trips; a unit converter for her hobby. Will pay
+       a small monthly fee for things that remove daily friction. Will NOT
+       debug, read documentation, or "configure" anything.
+
+  P2 — "THE TINKERER" (secondary, growth engine). Semi-technical. Likes that
+       they can open the code, nudge it, and re-prompt. Makes more ambitious
+       tools (a scraper-style fetcher, a small tracker with charts). Becomes a
+       word-of-mouth source and a power subscriber. Tolerates Tier-2 build waits.
+
+  P3 — "THE SOLO OPERATOR" (secondary). Runs a small business or side hustle.
+       Wants tools shaped exactly to their workflow: an invoice line-item
+       calculator, a quote generator, a content-idea spinner. Values that it's
+       private and on their phone.
+
+  NON-USER (explicitly): the person who wants to build and DISTRIBUTE apps to
+  other people, or run a marketplace of generated apps. That is a different
+  product, it is a regulatory minefield (Doc 07), and we are not building it.
+
+--------------------------------------------------------------------------------
+5.  PRIMARY USER JOURNEYS (the operational scenarios)
+--------------------------------------------------------------------------------
+
+  JOURNEY A — FIRST RUN (the make-or-break 90 seconds)
+    1. User installs and opens Wild Card.
+    2. A single, near-empty home screen with a prompt bar: "What do you want
+       to make?" and 2-3 tappable example chips ("Tip splitter", "Workout
+       timer", "Random team picker").
+    3. User taps a chip or types a sentence.
+    4. A build view opens. The user watches a short, honest progress sequence
+       and a LIVE PREVIEW of the tool appearing and becoming usable.
+    5. User pokes the preview. If happy, taps "Keep it." A new icon animates
+       onto the home screen.
+    6. THAT is the activation moment. Account creation, if required at all, is
+       offered AFTER this win, framed as "save your tools."
+    Success metric: user creates and runs one working app in the first session
+    (see Doc 08, activation KPI).
+
+  JOURNEY B — DAILY USE
+    1. Open app -> grid of the user's tools.
+    2. Tap an icon -> the tool launches full-screen and does its job.
+    3. Output (a number, a list, a generated text) appears. If the tool
+       produced something worth keeping, a host-provided "Share / Export"
+       control (part of the app's own chrome, NOT the tool's code — see Doc 03/07)
+       lets the user send it to Files, Messages, etc.
+
+  JOURNEY C — FIX OR EVOLVE A TOOL
+    1. Long-press an icon -> menu: Edit with AI / View code / Rename / Duplicate
+       / Delete / Move to folder.
+    2. "Edit with AI": user says what's wrong or what to add ("make the buttons
+       bigger", "add a dark mode", "also total the tax"). System re-generates,
+       re-validates, shows a preview, user accepts or discards (versioned).
+    3. "View code": opens a read/edit source view. Power users can edit directly;
+       a "Run" re-validates their change. (Tenet T2.)
+
+  JOURNEY D — ORGANIZE
+    Long-press to enter "jiggle" mode; drag to reorder; drag one icon onto
+    another to create a folder; rename folders. Mirrors the phone, deliberately.
+
+  JOURNEY E — IMPORT YOUR OWN
+    "Import" accepts a pasted code snippet or a file (an HTML/JS bundle, or a
+    simple script the runtime understands). The system wraps it as an app,
+    validates it, and places it on the grid. Lets the Tinkerer bring existing
+    work in.
+
+--------------------------------------------------------------------------------
+6.  WHAT A "TOOL" CAN BE (and the honest boundary)
+--------------------------------------------------------------------------------
+
+IN SCOPE (covers the overwhelming majority of real requests):
+  - Calculators, converters, estimators, splitters.
+  - Trackers, logs, counters, streaks, simple habit tools (data stored locally).
+  - Generators (names, ideas, workouts, schedules, passwords, text templates).
+  - Formatters and cleaners (text case, CSV tidy-up, list dedupe/sort).
+  - Timers, stopwatches, interval tools.
+  - Small data dashboards and charts over data the user types or pastes.
+  - Reference tools and lookups, including ones that call an approved web API
+    (e.g. weather, currency) where allowed.
+  - Simple single-player games and toys.
+
+OUT OF SCOPE for v1 (state it plainly to the user when asked):
+  - Tools that need deep, always-on access to the phone's private data
+    (full contacts sync, background location, reading other apps' data). On
+    iOS this is prohibited for generated code (Doc 07); on Android it is
+    possible but deferred.
+  - Tools that distribute content to other users or act as a social network.
+  - Anything requiring real-money gaming, payments handling, or regulated
+    financial/medical functions.
+  - Long-running background processes / daemons.
+
+The boundary is a feature. By keeping tools personal, local, and self-contained,
+we stay fast, private, cheap to run, and shippable on both stores.
+
+--------------------------------------------------------------------------------
+7.  PRODUCT SCOPE BY PHASE (what "the best version" means, staged)
+--------------------------------------------------------------------------------
+
+The user asked for the best version, not a thin MVP. The best version is the
+GA target below. We still SEQUENCE it (Doc 05) so value ships early and the
+biggest risk — store approval — is retired before we over-invest.
+
+  GA ("best version") includes:
+    - iOS and Android.
+    - Tier-1 generation (instant) AND Tier-2 agentic builds (for hard tools).
+    - Live build preview, AI editing, source view/edit, import.
+    - Home grid with folders, drag, long-press actions.
+    - Local-first storage with optional encrypted cloud sync.
+    - Subscription with a generous free tier (Doc 08).
+    - Full eval/validation harness so generated tools "just work."
+
+  Deliberately NOT in even the best v1: multi-user sharing, a public gallery/
+  marketplace, team/collaboration features, web-embed of others' tools,
+  plug-in ecosystems. These are post-GA bets, gated on demand and on store risk.
+
+--------------------------------------------------------------------------------
+8.  NAMING & BRAND NOTE
+--------------------------------------------------------------------------------
+
+"Wild Card" is the working title and is evocative (any tool, on demand). Before
+launch: run a trademark and App Store / Play name-collision check (OQ-01). Have
+a fallback name ready. The product's verbal identity should stay plain-spoken
+and confident — the opposite of jargon. The model-facing and user-facing copy
+must never call generated tools "scripts" to end users (that word is for the
+developer docs and the store-review framing); to users they are "apps" or
+"tools."
+
+================================================================================
+  END OF DOCUMENT 01
+================================================================================

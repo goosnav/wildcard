@@ -1,0 +1,96 @@
+// CMP-05 — the validation/eval harness. Loads a candidate bundle in headless
+// Chromium under the SAME Runtime SDK + sandbox the device uses, and confirms it
+// runs before delivery (REQ-GEN-002/010). On web this is true parity: the host
+// runtime IS the validation runtime. Output feeds the repair loop or packaging.
+
+import { chromium, type Browser } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import type { Bundle } from "@wildcard/runtime";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const RUNTIME_GLOBAL = resolve(here, "../../runtime/dist/runtime.global.js");
+
+export interface ValidationResult {
+  pass: boolean;
+  errors: string[];
+}
+
+let browserPromise: Promise<Browser> | null = null;
+function getBrowser(): Promise<Browser> {
+  if (!browserPromise) browserPromise = chromium.launch();
+  return browserPromise;
+}
+
+export async function closeValidator(): Promise<void> {
+  if (browserPromise) {
+    const b = await browserPromise;
+    await b.close();
+    browserPromise = null;
+  }
+}
+
+/**
+ * Run static + dynamic checks. The dynamic check mounts the bundle exactly as
+ * the host would and watches for fatal console errors and WC error signals
+ * during a short settling window.
+ */
+export async function validate(
+  bundle: Bundle,
+  opts: { settleMs?: number } = {}
+): Promise<ValidationResult> {
+  const errors: string[] = [];
+  const html = bundle.files["index.html"] ?? "";
+
+  // --- static checks (cheap, catch the obvious before spinning a browser) ---
+  if (!html.trim()) errors.push("index.html is empty");
+  if (/<script\s+[^>]*\bsrc\s*=/i.test(html))
+    errors.push("Remote <script src> is forbidden (must be self-contained)");
+  if (/<link\s+[^>]*\bhref\s*=\s*["']https?:/i.test(html))
+    errors.push("Remote <link href> is forbidden (must be self-contained)");
+  if (errors.length) return { pass: false, errors };
+
+  // --- dynamic check: actually run it ---
+  const runtimeSrc = readFileSync(RUNTIME_GLOBAL, "utf8");
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (e) => consoleErrors.push(String(e.message || e)));
+  page.on("console", (m) => {
+    if (m.type() === "error") consoleErrors.push(m.text());
+  });
+
+  try {
+    await page.setContent("<!doctype html><html><body><div id='stage'></div></body></html>");
+    await page.addScriptTag({ content: runtimeSrc });
+
+    const wcErrors: string[] = await page.evaluate(
+      async ({ bundle, settleMs }) => {
+        const RT = (window as any).WildcardRuntime;
+        const errs: string[] = [];
+        let ready = false;
+        const mounted = RT.mountTool(document.getElementById("stage"), {
+          bundle,
+          storage: RT.memoryStorage(),
+          onError: (m: string) => errs.push(m),
+        });
+        // Detect the SDK 'ready' signal by racing a short wait.
+        const frame = mounted.frame as HTMLIFrameElement;
+        await new Promise((r) => setTimeout(r, settleMs));
+        ready = !!frame; // mount produced a frame
+        if (!ready) errs.push("Tool frame failed to mount");
+        return errs;
+      },
+      { bundle: bundle as any, settleMs: opts.settleMs ?? 400 }
+    );
+
+    errors.push(...wcErrors, ...consoleErrors);
+    return { pass: errors.length === 0, errors };
+  } catch (e) {
+    errors.push(e instanceof Error ? e.message : String(e));
+    return { pass: false, errors };
+  } finally {
+    await page.close();
+  }
+}

@@ -1,0 +1,213 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 07 · STORE APPROVAL & COMPLIANCE PATH (APPLE + GOOGLE)
+================================================================================
+
+  This document is the single biggest external risk to the program. Treat it as
+  a first-class engineering constraint, not paperwork. Status: BASELINE v1.0
+
+  NOT LEGAL ADVICE. Store guidelines and AI laws change frequently. Everything
+  here was accurate to public guidance as of mid-2026 and MUST be re-verified
+  against the live guidelines at project start and before each submission
+  (OQ-05). Engage qualified counsel for the privacy/AI-law items.
+
+--------------------------------------------------------------------------------
+7.1  WHY THIS IS HARD (the 2025-2026 reality)
+--------------------------------------------------------------------------------
+
+  Apple tightened the rules on exactly this category in late 2025 / 2026 and has
+  been enforcing them. Two facts shape our entire design:
+
+  (a) Guideline 2.5.2: apps must be self-contained and may not download/execute
+      code that introduces or changes the app's features. There is a narrow
+      EDUCATIONAL carve-out: apps designed to teach, develop, or let users TEST
+      executable code may, in limited circumstances, download code provided it
+      isn't used for other purposes, AND the source must be completely viewable
+      and editable by the user.
+
+  (b) Guideline 4.7 (mini apps / HTML5): Apple permits HTML5 + JavaScript mini
+      apps, but the late-2025 update REMOVED the old "web content escapes review"
+      interpretation and added rules 4.7.1-4.7.5. Critically, 4.7.2 prohibits
+      apps from extending or exposing native platform APIs to non-embedded
+      (downloaded/generated) software WITHOUT prior Apple approval — i.e. no
+      custom native bridge to generated code by default. 4.7.4 requires a
+      content manifest/index of the software offered.
+
+  Apple has acted on this: in early 2026 it removed at least one "vibe-coding"
+  app from the store citing 2.5.2 and the Developer Program License section
+  3.3.1(B) (interpreted code may be downloaded only if it doesn't change the
+  app's primary purpose with inconsistent functionality).
+
+  Google Play is MORE permissive about interpreted/dynamic code, but has its own
+  hard requirements around AI-generated content safety (see 7.3).
+
+  Our architecture (Doc 03) is built specifically to live inside these rules.
+
+--------------------------------------------------------------------------------
+7.2  APPLE — THE COMPLIANT POSTURE & APPROVAL PATH
+--------------------------------------------------------------------------------
+
+  POSITIONING (this is the strategy, not spin):
+    Wild Card is presented to Apple as a PERSONAL SCRIPTING / AUTOMATION TOOL in
+    which the user creates and runs their OWN tools, with the full source ALWAYS
+    viewable and editable (Tenet T2; REQ-EDIT-001). This is the same lane long
+    occupied by accepted scripting/coding apps. It maps directly onto the 2.5.2
+    educational/developer carve-out. To the END USER the copy says "apps/tools";
+    to Apple the framing is "a scripting environment with user-owned, user-
+    editable source."
+
+  WHAT WE DO TO COMPLY (design commitments):
+    C1. Tools run as HTML5/JavaScript inside WebKit/JavaScriptCore (the WebView).
+        No native compiled code is generated or executed. (2.5.2 / 4.7)
+    C2. NO custom native API bridge is exposed to generated code on iOS.
+        Device actions (share/export, file pick) are performed by the HOST's own
+        native chrome, reading a result the tool handed up via WC.output
+        (Doc 03 §3.6). (4.7.2)
+    C3. Source of every tool is fully viewable and editable by its owner. (2.5.2)
+    C4. Tools are PRIVATE to the user. We are NOT a store-within-a-store and NOT
+        a marketplace/gallery of other people's tools. This avoids the "app
+        store inside an app" trap and keeps the manifest scope small. (4.7)
+    C5. Content manifest (4.7.4): we provide an index of the software we OFFER —
+        i.e. the HOST app and the handful of TEMPLATED example tools we ship —
+        plus the generation policy. A user's privately generated tools are their
+        own content, disclosed via our content/safety policy and the reporting
+        mechanism, not distributed by us.
+    C6. AI data-sharing consent (5.1.2(i)): before the first generation we
+        disclose that prompts are sent to a third-party AI provider and obtain
+        consent. (REQ-PRIV-001)
+    C7. Login (4.8): offer Sign in with Apple alongside any third-party/social
+        login used to set up the primary account.
+    C8. Egress is allow-listed (REQ-RUN-005); generated tools cannot become a
+        conduit to arbitrary or disallowed content/services.
+
+  ACCOUNT & SUBMISSION MECHANICS:
+    - Enroll in the Apple Developer Program (~US$99/year). Org enrollment (D-U-N-S
+      number) recommended over individual for a commercial product.
+    - Build signing, App Store Connect record, App Privacy ("nutrition label")
+      completed accurately (REQ-PRIV-003).
+    - Subscriptions sold via StoreKit in-app purchase (REQ-PAY-002). Apple's
+      commission applies; the Small Business Program reduces it to 15% for
+      developers under the revenue threshold (us, initially) — enroll in it.
+    - Distribute beta via TestFlight; submit for App Review.
+
+  REVIEW EXPECTATIONS & TIMELINE:
+    - Initial review of a code-generation app should be assumed to draw EXTRA
+      scrutiny. Budget 2-3 review rounds. Typical review turnaround is on the
+      order of a day or two per round, but plan for longer on a novel category.
+    - Prepare a reviewer note explaining the scripting/automation positioning,
+      the source-visible/editable design, the absence of a native bridge, the
+      content-safety + reporting controls, and the egress allow-list. Make the
+      reviewer's job easy.
+    - Have a designated demo account and 2-3 pre-made example tools so the
+      reviewer immediately sees benign, useful, self-contained behavior.
+
+  IF APPLE STILL REJECTS:
+    - Escalate via the Resolution Center with the positioning note; if needed,
+      request a call / App Review Board appeal.
+    - Fallback channels (7.5): ship the web/PWA version (no App Review), and/or
+      lead with Android, while iterating the iOS posture.
+
+--------------------------------------------------------------------------------
+7.3  GOOGLE PLAY — APPROVAL PATH
+--------------------------------------------------------------------------------
+
+  Google Play permits this category more readily, but enforces an AI-Generated
+  Content policy and the general Developer Program Policies. Requirements:
+
+    G1. AI-Generated Content policy: the app must PREVENT generation of
+        prohibited content (CSAM and anything sexualizing minors; non-consensual
+        sexual deepfakes; content enabling scams/deception; content promoting
+        self-harm or dangerous acts; deceptive election content; harassment).
+        Implement input + output safety screening (CMP-12) accordingly.
+    G2. In-app reporting: provide a way for users to flag offensive generated
+        content, and feed those reports into moderation/filters. (REQ-PRIV-002)
+    G3. Comply with all other policies: Malware / Mobile Unwanted Software,
+        Device & Network Abuse (relevant to any dynamic code — keep it sandboxed
+        and non-deceptive), User Data + the Data Safety form, Deceptive Behavior,
+        Intellectual Property, and Families policy if applicable (we age-gate
+        and are NOT directed to children — REQ-PRIV-005).
+    G4. AI transparency/labeling expectations are rising; disclose AI use and
+        keep moderation evidence (also helps EU AI Act — 7.4).
+
+  ACCOUNT & SUBMISSION MECHANICS:
+    - Google Play Developer account (one-time ~US$25). Identity verification
+      required. Organization account for a commercial product.
+    - Subscriptions via Google Play Billing (REQ-PAY-002); commission with the
+      reduced 15% tier for the first revenue band applies.
+    - Complete the Data Safety form accurately; provide a privacy policy URL.
+    - Release through internal -> closed -> open testing tracks; expect a
+      pre-launch review. New personal/financial-data or AI apps may face added
+      identity and policy checks; budget time for these.
+
+  REVIEW EXPECTATIONS:
+    - Review can take from hours to several days; new accounts and AI apps trend
+      slower. The substantive risk is the AI-content policy, not dynamic code —
+      so the moderation + reporting build (CMP-12) is the gating work for Play.
+
+--------------------------------------------------------------------------------
+7.4  CROSS-CUTTING LEGAL / REGULATORY (verify with counsel — OQ-02)
+--------------------------------------------------------------------------------
+
+  - EU AI Act: transparency duties for AI systems that generate content
+    (users informed they're interacting with AI; AI-generated content
+    appropriately disclosed); broader obligations phase in over 2025-2026+.
+    Affects EU availability and your disclosures.
+  - United States: a patchwork of state requirements (e.g. disclosure/
+    transparency and bias-related rules in several states) plus evolving federal
+    direction. Maintain clear AI-use disclosure and records.
+  - General: a clear Privacy Policy and Terms of Service; data-subject rights
+    (access/export/delete — REQ-DATA-004); a defined data-retention policy for
+    prompts and generated content; processor terms with the AI provider.
+  - AI provider terms: using the model/agent SDK to power an end-user product is
+    governed by the provider's COMMERCIAL terms, and you must authenticate with
+    your own API key/billing (not a consumer chat login). Confirm at start.
+
+--------------------------------------------------------------------------------
+7.5  FALLBACK & SEQUENCING STRATEGY (de-risk early)
+--------------------------------------------------------------------------------
+
+  - The Phase 0 spike (Doc 05, M0) MUST include a skeleton submission test of the
+    scripting/automation posture on BOTH stores, before heavy investment.
+  - WEB / PWA FIRST is a legitimate and fast lead channel: it sidesteps App
+    Review entirely, reaches paying users immediately (web checkout), reuses the
+    same Runtime SDK + bundle format, and proves demand (Doc 08). iOS PWAs have
+    capability limits, but for the in-scope tool catalog (Doc 01 §6) that is
+    largely acceptable. Strongly consider launching here first.
+  - LEAD WITH ANDROID for the native experience if Apple posture is uncertain;
+    add iOS once the positioning is validated.
+  - Keep the iOS build's capability surface minimal by design (Doc 03 §3.9) so
+    there is the least possible for a reviewer to object to.
+
+--------------------------------------------------------------------------------
+7.6  COMPLIANCE CHECKLIST (gate G5 in Doc 06; sign before each submission)
+--------------------------------------------------------------------------------
+
+  [ ] Tools run only as HTML5/JS in the platform WebView (no native exec).      (C1)
+  [ ] iOS: no native API bridge exposed to generated code.                       (C2)
+  [ ] Source of every tool viewable + editable by owner.                         (C3)
+  [ ] Not a marketplace/gallery; tools are private to the user.                  (C4)
+  [ ] Content manifest of host + example tools prepared (iOS).                   (C5)
+  [ ] AI data-sharing consent shown before first generation.                     (C6)
+  [ ] Sign in with Apple offered (iOS); privacy-respecting login (Android).      (C7)
+  [ ] Network egress allow-listed; logged.                                       (C8)
+  [ ] Input + output safety screening live; prohibited categories blocked.   (G1/CMP-12)
+  [ ] In-app reporting wired to moderation.                                  (G2/REQ-PRIV-002)
+  [ ] Privacy policy + ToS published; Apple Privacy Label + Play Data Safety done.
+  [ ] Account + data export and delete available in-app.                     (REQ-DATA-004)
+  [ ] Age gating set; store age ratings completed.                           (REQ-PRIV-005)
+  [ ] Reviewer note + demo account + example tools prepared.
+  [ ] IAP via StoreKit / Play Billing; Small Business / reduced-rate enrolled.
+  [ ] Live guidelines re-checked within 7 days of submission.                    (OQ-05)
+
+--------------------------------------------------------------------------------
+7.7  POLICY CHANGE-WATCH (assign an owner)
+--------------------------------------------------------------------------------
+
+  The PM owns a standing task to monitor Apple App Review Guideline updates
+  (esp. 2.5.2, 4.7.x) and Google Play AI/policy updates, and to re-run the 7.6
+  checklist whenever either changes. A policy change can be a Sev-1 event for
+  this product (RSK-01).
+
+================================================================================
+  END OF DOCUMENT 07
+================================================================================

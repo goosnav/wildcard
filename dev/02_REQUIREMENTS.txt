@@ -1,0 +1,292 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 02 · REQUIREMENTS (THE CONTRACT)
+================================================================================
+
+  Maps to NASA "V": SYSTEM-LEVEL & SUB-SYSTEM REQUIREMENTS. Verified by Doc 06.
+  Status: BASELINE v1.0
+
+  Priority key (MoSCoW):  [M] Must (GA blocker)   [S] Should   [C] Could (post-GA)
+  Verification key:       T = Test, A = Analysis, D = Demonstration, I = Inspection
+  Each requirement names the verification method; Doc 06 holds the test cases.
+
+  Reading note: requirement statements use "shall." Acceptance criteria define
+  the measurable bar a tester checks. IDs are stable; do not renumber.
+
+================================================================================
+  A.  GENERATION  (REQ-GEN-***)   — turning words into a working app
+================================================================================
+
+REQ-GEN-001 [M] (T)
+  The system shall accept a natural-language description (typed or transcribed
+  from speech) of a desired tool and return a runnable app bundle.
+  Accept: For a corpus of 100 representative prompts (Doc 06 eval set), >=85%
+  produce an app that loads and performs its core function on first delivery.
+
+REQ-GEN-002 [M] (T)
+  The system shall not deliver a generated app to the user until the app has
+  passed automated validation (loads without fatal error; core smoke test
+  passes). See REQ-GEN-010 and Doc 06 eval harness.
+  Accept: 0 apps reach the user UI without a recorded PASS from validation.
+
+REQ-GEN-003 [M] (D)
+  During generation the system shall present a live, progressively-updating
+  preview of the app being built, runnable by the user before they keep it.
+  Accept: Preview is interactive within the build view; "Keep" persists it,
+  "Discard" removes it with no residue.
+
+REQ-GEN-004 [M] (T)
+  The system shall support a fast path (Tier-1: single model call + bounded
+  self-repair, target <= N repair turns, default N=3) for typical tools.
+  Accept: p50 end-to-end time for Tier-1 <= 20 s; p90 <= 45 s (Doc 08 metric).
+
+REQ-GEN-005 [S] (T)
+  The system shall support an agentic path (Tier-2: server-side iterative build
+  with tooling and tests) for tools the fast path cannot complete.
+  Accept: Tier-2 raises overall success on the "hard" eval subset by >=20
+  percentage points over Tier-1 alone.
+
+REQ-GEN-006 [M] (D)
+  The system shall let the user revise an existing app via natural language
+  ("edit with AI"), producing a new version while preserving the prior version.
+  Accept: Each accepted edit creates a restorable version; user can revert.
+
+REQ-GEN-007 [M] (T)
+  The system shall refuse, in plain language, prompts that request disallowed
+  functionality (Doc 07 content rules; Doc 03 security), and shall offer a
+  compliant alternative where one exists.
+  Accept: 100% of red-team disallowed prompts (Doc 06) are refused; refusals
+  are non-technical and actionable.
+
+REQ-GEN-008 [M] (D)
+  When a tool cannot be built, the system shall say so honestly and offer a
+  reduced-scope version rather than delivering a broken app. (Tenet T4.)
+  Accept: Forced-failure tests yield an explanation + offer, never a dead icon.
+
+REQ-GEN-009 [S] (T)
+  The system shall route each request to the cheapest model tier that clears the
+  quality bar for that request class (Doc 04 model strategy).
+  Accept: Cost-per-successful-generation tracked; routing reduces blended COGS
+  vs. always-flagship by >=40% at equal success (Doc 08).
+
+REQ-GEN-010 [M] (T)
+  Generated apps shall be validated in an isolated headless runtime mirroring
+  the on-device runtime before delivery (no native bridge calls succeed unless
+  the platform permits them).
+  Accept: Validation runtime parity verified; false-pass rate < 3%.
+
+REQ-GEN-011 [S] (T)
+  The system shall let a user import their own code (pasted snippet or uploaded
+  HTML/JS bundle) and wrap it as an app after validation.
+  Accept: Valid imports become runnable apps; invalid imports get a clear reason.
+
+================================================================================
+  B.  RUNTIME / EXECUTION  (REQ-RUN-***)   — apps running on the device
+================================================================================
+
+REQ-RUN-001 [M] (T)
+  Generated apps shall execute on the user's device inside a WebView, with no
+  server round-trip required to run a previously created app.
+  Accept: Airplane-mode test — every previously created app whose function does
+  not inherently need the network launches and runs offline.
+
+REQ-RUN-002 [M] (T)
+  Each app shall run in an isolated runtime context with no access to other
+  apps' code or stored data.
+  Accept: Cross-app isolation test passes (App A cannot read App B's storage).
+
+REQ-RUN-003 [M] (T)
+  Each app shall have access to a private, persistent key-value store scoped to
+  that app, provided by the Runtime SDK (Doc 04).
+  Accept: Data written by an app persists across relaunch and device restart;
+  is removed when the app is deleted.
+
+REQ-RUN-004 [M] (D)
+  The host (native chrome around the WebView), not the app's own code, shall
+  provide the controls for exporting/sharing an app's output to the OS share
+  sheet / Files. (Compliance: Doc 07, Apple 4.7.2.)
+  Accept: Export works from host chrome; the app's JS cannot itself invoke a
+  native share/file API on iOS.
+
+REQ-RUN-005 [M] (T)
+  Apps shall be prevented from making arbitrary network requests; network egress
+  shall be constrained to an allow-list policy enforced by the host/runtime.
+  Accept: A generated app attempting to reach a non-allowed origin is blocked;
+  event is logged.
+
+REQ-RUN-006 [S] (D)
+  On Android, the runtime MAY expose an extended capability set (e.g. richer
+  file export, share, clipboard) via a permissioned bridge, subject to per-use
+  consent. (Platform divergence — Doc 03/04/07.)
+  Accept: Android capability calls prompt for consent and are auditable; iOS
+  build does not include the extended bridge.
+
+REQ-RUN-007 [M] (T)
+  An app crash or runtime error shall be contained to that app and surfaced to
+  the user as a friendly state with a "Fix with AI" option; it shall not crash
+  the host.
+  Accept: Injected-error test — host remains stable; user is offered a repair.
+
+REQ-RUN-008 [S] (T)
+  App launch time (icon tap to interactive) shall be fast.
+  Accept: p50 cold launch <= 800 ms; p90 <= 1500 ms on a mid-tier device.
+
+================================================================================
+  C.  HOME SCREEN / LIBRARY  (REQ-HOME-***)
+================================================================================
+
+REQ-HOME-001 [M] (D)  The home screen shall display the user's apps as a grid of
+  icons, with a persistent prompt entry (bar or "+") to create a new app.
+REQ-HOME-002 [M] (D)  Users shall reorder icons via drag, mirroring phone UX.
+REQ-HOME-003 [M] (D)  Users shall create folders by dragging one icon onto
+  another, and rename folders.
+REQ-HOME-004 [M] (D)  A long-press on an icon shall reveal: Edit with AI, View
+  code, Rename, Duplicate, Move to folder, Delete.
+REQ-HOME-005 [M] (T)  Deleting an app shall remove its bundle and its scoped
+  storage; deletion shall be confirmable and (within session) undoable.
+REQ-HOME-006 [S] (D)  Each app shall have an auto-suggested icon and name,
+  editable by the user.
+REQ-HOME-007 [C] (D)  Users MAY search/filter their library by name.
+
+================================================================================
+  D.  CODE / SOURCE  (REQ-EDIT-***)
+================================================================================
+
+REQ-EDIT-001 [M] (D)  The full source of every app shall be viewable by its
+  owner in-app. (Tenet T2; compliance enabler — Doc 07, 2.5.2 carve-out.)
+REQ-EDIT-002 [M] (D)  The owner shall be able to edit source directly and run
+  the edited version, which is then re-validated.
+REQ-EDIT-003 [S] (D)  The editor shall provide syntax highlighting and basic
+  error feedback.
+REQ-EDIT-004 [M] (T)  Edited code shall pass the same validation as generated
+  code before it can replace the live version.
+
+================================================================================
+  E.  DATA & SYNC  (REQ-DATA-***)
+================================================================================
+
+REQ-DATA-001 [M] (T)  App bundles and metadata shall be stored locally first;
+  the app is fully usable with no account and no network (after creation).
+REQ-DATA-002 [S] (T)  With an account, the user's library (bundles + metadata +
+  per-app data, where the user opts in) shall sync across the user's devices.
+REQ-DATA-003 [M] (T)  Sync payloads containing user data shall be encrypted in
+  transit and at rest. (See REQ-SEC-004.)
+REQ-DATA-004 [M] (D)  The user shall be able to export their entire library
+  (all apps + data) and to delete it. (Tenet T5; privacy law — Doc 07.)
+REQ-DATA-005 [S] (T)  Sync shall use last-write-wins per object with conflict
+  surfaced to the user only when content materially diverges.
+
+================================================================================
+  F.  ACCOUNTS / AUTH  (REQ-ACCT-***)
+================================================================================
+
+REQ-ACCT-001 [M] (D)  Account creation shall NOT block the first app-creation
+  win; it shall be offered after activation, framed as saving the user's tools.
+REQ-ACCT-002 [M] (T)  The system shall support Sign in with Apple (iOS) and a
+  privacy-respecting equivalent on Android, plus email. (Apple 4.8 — Doc 07.)
+REQ-ACCT-003 [M] (T)  All privileged backend actions (generation, sync, billing)
+  shall require a valid authenticated session token.
+REQ-ACCT-004 [M] (D)  Users shall be able to delete their account and all
+  associated server data from within the app. (App-store requirement — Doc 07.)
+
+================================================================================
+  G.  BILLING / MONETIZATION  (REQ-PAY-***)
+================================================================================
+
+REQ-PAY-001 [M] (T)  A free tier shall allow a metered number of Tier-1
+  generations per period at no cost (Doc 08).
+REQ-PAY-002 [M] (T)  Paid subscriptions shall be sold via the platform's in-app
+  purchase system (StoreKit / Play Billing). (Doc 07.)
+REQ-PAY-003 [M] (T)  Generation quota/credits shall be enforced server-side; the
+  client shall never be the source of truth for entitlements.
+REQ-PAY-004 [M] (T)  Entitlement state shall update on purchase, renewal, and
+  cancellation via the platforms' server notifications.
+REQ-PAY-005 [S] (D)  Users shall see remaining quota/credits clearly before and
+  after a generation.
+
+================================================================================
+  H.  SECURITY  (REQ-SEC-***)   (full model in Doc 03)
+================================================================================
+
+REQ-SEC-001 [M] (I/A)  No LLM provider API key or other secret shall ever be
+  present in the client app or in a generated app bundle. All model calls route
+  through the backend.
+REQ-SEC-002 [M] (T)  Generated app code shall run under a restrictive Content
+  Security Policy and sandbox; it shall not be able to exfiltrate data to
+  non-allow-listed destinations (REQ-RUN-005).
+REQ-SEC-003 [M] (T)  The backend shall apply per-user rate limiting and abuse
+  detection on generation endpoints.
+REQ-SEC-004 [M] (T)  User data at rest (server) and in transit shall be
+  encrypted (TLS in transit; encryption at rest for stored bundles/data).
+REQ-SEC-005 [M] (A)  Prompt-injection content inside imported code or fetched
+  data shall not be able to escalate capability or alter host behavior.
+
+================================================================================
+  I.  PRIVACY & COMPLIANCE  (REQ-PRIV-***)   (paths in Doc 07)
+================================================================================
+
+REQ-PRIV-001 [M] (I)  The app shall disclose, before first generation, that
+  prompts are sent to a third-party AI provider, and obtain consent.
+  (Google Play 5.x AI rules; Apple 5.1.2(i).)
+REQ-PRIV-002 [M] (D)  The app shall provide an in-app way to report a generated
+  app/output as harmful, and shall feed reports into moderation. (Google Play
+  AI-Generated Content policy.)
+REQ-PRIV-003 [M] (I)  The app shall publish a privacy policy and complete the
+  platforms' privacy disclosures (Apple Privacy Nutrition Label; Play Data
+  Safety form) accurately.
+REQ-PRIV-004 [M] (A)  AI-generated output shall be handled in line with
+  applicable AI-transparency and consumer-disclosure regimes in target markets
+  (e.g. EU AI Act transparency duties; relevant US state disclosure laws).
+  Legal review required pre-launch (OQ-02).
+REQ-PRIV-005 [M] (A)  The product shall not be directed to children under the
+  applicable age; age gating and store age-rating shall be set accordingly.
+
+================================================================================
+  J.  NON-FUNCTIONAL  (REQ-NFR-***)
+================================================================================
+
+REQ-NFR-001 [M] (A)  Availability of the backend generation service shall target
+  99.5% monthly; a generation failure shall degrade gracefully (retry / queue /
+  honest message), never a silent hang.
+REQ-NFR-002 [M] (T)  The app shall meet platform accessibility basics (dynamic
+  type, VoiceOver/TalkBack labels on all controls, sufficient contrast).
+REQ-NFR-003 [S] (A)  The system shall be observable: generation success rate,
+  latency, cost per generation, crash rate, and activation are measurable in
+  near-real-time dashboards (Doc 08 KPIs).
+REQ-NFR-004 [M] (A)  The architecture shall scale generation throughput
+  horizontally without client changes.
+REQ-NFR-005 [S] (I)  Localization-ready: user-facing strings externalized;
+  English at launch, with structure to add languages.
+REQ-NFR-006 [M] (A)  Cost guardrail: a single user shall not be able to incur
+  unbounded model cost; hard per-period ceilings enforced server-side
+  (REQ-PAY-003, REQ-SEC-003).
+
+================================================================================
+  K.  PLATFORM  (REQ-PLT-***)
+================================================================================
+
+REQ-PLT-001 [M] (I)  iOS build shall comply with App Store Review Guidelines,
+  specifically 2.5.2 (self-contained / educational carve-out), 4.7.1-4.7.5
+  (mini apps), and 4.7.2 (no native-API exposure to generated code without
+  approval). See Doc 07.
+REQ-PLT-002 [M] (I)  Android build shall comply with Google Play Developer
+  Program Policies, including the AI-Generated Content policy and malware /
+  dynamic-code provisions. See Doc 07.
+REQ-PLT-003 [M] (A)  iOS minimum target: current iOS minus 2 major versions.
+  Android minimum: a named API level covering >=90% of active devices.
+REQ-PLT-004 [S] (A)  A web/PWA channel MAY exist as a distribution and risk-
+  mitigation fallback (Doc 07 strategy), not required for GA.
+
+--------------------------------------------------------------------------------
+  TRACEABILITY SNAPSHOT (illustrative — full matrix maintained in tracker)
+--------------------------------------------------------------------------------
+
+  REQ-GEN-002  -> CMP-03,CMP-05 (Doc 03) -> WBS 5.4 (Doc 05) -> TC-GEN-002..006
+  REQ-RUN-004  -> CMP-07,CMP-08 (Doc 03) -> WBS 5.3 (Doc 05) -> TC-RUN-004,012
+  REQ-RUN-005  -> CMP-07        (Doc 03) -> WBS 5.3 (Doc 05) -> TC-SEC-002
+  REQ-PAY-003  -> CMP-09        (Doc 03) -> WBS 5.6 (Doc 05) -> TC-PAY-003,004
+  REQ-PLT-001  -> Doc 07 §2     (Apple)  -> WBS 5.8 (Doc 05) -> TC-PLT-001
+
+================================================================================
+  END OF DOCUMENT 02
+================================================================================

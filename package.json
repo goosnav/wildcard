@@ -1,0 +1,13 @@
+{
+  "name": "wildcard",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Describe a tool, get a working tool. Monorepo root.",
+  "workspaces": [
+    "runtime",
+    "server"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

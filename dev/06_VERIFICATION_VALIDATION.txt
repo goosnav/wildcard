@@ -1,0 +1,156 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 06 · VERIFICATION & VALIDATION (V&V)
+================================================================================
+
+  Maps to NASA "V": THE ENTIRE RIGHT SIDE (component -> subsystem -> system
+  verification, then system validation). Each level proves the matching left-
+  side document. Status: BASELINE v1.0
+
+  Verification = "did we build the thing right?" (meets Doc 02 requirements).
+  Validation   = "did we build the right thing?" (serves Doc 01 ConOps).
+
+--------------------------------------------------------------------------------
+6.1  V&V LEVELS (bottom-up)
+--------------------------------------------------------------------------------
+
+  LEVEL 1 — COMPONENT VERIFICATION (proves Doc 03/04 component design)
+    Unit + integration tests per component (CMP-01..CMP-13). Examples: storage
+    scoping, egress allow-list enforcement, entitlement math, repair-loop
+    termination, manifest generation.
+
+  LEVEL 2 — SUBSYSTEM VERIFICATION (proves Doc 02 subsystem requirements)
+    The generation subsystem, the runtime subsystem, the billing subsystem, and
+    the sync subsystem each tested end-to-end in isolation against their REQ-*.
+
+  LEVEL 3 — SYSTEM VERIFICATION (proves the full Doc 02 contract)
+    Full-stack flows on real devices: create -> keep -> run -> edit -> export,
+    across the device matrix, online and offline.
+
+  LEVEL 4 — SYSTEM VALIDATION (proves Doc 01 ConOps)
+    Does a non-technical user get a working tool in their first session, and
+    keep coming back? Measured by the activation and retention KPIs (Doc 08) in
+    closed beta with REAL target-persona users, not the team.
+
+--------------------------------------------------------------------------------
+6.2  THE GENERATION EVAL HARNESS (the most important test asset)
+--------------------------------------------------------------------------------
+
+  Because the product's core output is model-generated, classic test suites are
+  necessary but not sufficient. We need EVALS: a representative, versioned set of
+  prompts with expected behaviors, scored automatically.
+
+  Composition (>=200 prompts, grown from real usage over time):
+    - Catalog coverage: calculators, trackers, generators, formatters, timers,
+      dashboards, API-lookups, simple games (Doc 01 §6).
+    - Difficulty bands: simple / standard / hard (to test routing + Tier-2).
+    - Adversarial/red-team: disallowed requests (Doc 07), prompt-injection in
+      imported code/fetched data, capability-escalation attempts.
+    - Regression seeds: every past failure becomes a permanent eval case.
+
+  Scoring (automated via CMP-05 headless runtime; Batch API for cost):
+    - Loads without fatal error?                     (gate)
+    - Core smoke test passes?                         (gate)
+    - Stays within declared/allowed capabilities?     (gate)
+    - No disallowed network attempts?                 (gate)
+    - Latency and token cost recorded                 (tracked, not gated)
+
+  Gates:
+    - SUCCESS RATE on the corpus >= 85% before GA (REQ-GEN-001) and must not
+      regress beyond a set threshold on any prompt/model change (CI gate).
+    - 100% refusal on the disallowed subset (REQ-GEN-007).
+    - 0% capability-escalation success (REQ-SEC-005).
+
+--------------------------------------------------------------------------------
+6.3  TEST CATEGORIES & REPRESENTATIVE CASES (-> requirements)
+--------------------------------------------------------------------------------
+
+  GENERATION
+    TC-GEN-001  Typical prompt yields a working tool          -> REQ-GEN-001
+    TC-GEN-002  No bundle delivered without a PASS             -> REQ-GEN-002
+    TC-GEN-003  Live preview interactive; Keep/Discard clean   -> REQ-GEN-003
+    TC-GEN-004  Tier-1 latency within p50/p90 targets          -> REQ-GEN-004
+    TC-GEN-005  Tier-2 lifts hard-subset success               -> REQ-GEN-005
+    TC-GEN-006  Edit-with-AI versions + reverts                -> REQ-GEN-006
+    TC-GEN-007  Disallowed prompts refused w/ alternative      -> REQ-GEN-007
+    TC-GEN-008  Unbuildable -> honest reduced-scope offer      -> REQ-GEN-008
+
+  RUNTIME / SECURITY
+    TC-RUN-001  Previously-made tools run offline              -> REQ-RUN-001
+    TC-RUN-002  App A cannot read App B storage                -> REQ-RUN-002/003
+    TC-RUN-004  Export only via host chrome (iOS)              -> REQ-RUN-004
+    TC-SEC-002  Non-allow-listed egress blocked + logged       -> REQ-RUN-005/SEC-002
+    TC-RUN-007  App crash contained; host stable; "Fix" offered-> REQ-RUN-007
+    TC-SEC-001  No provider key in client/bundle (inspection)  -> REQ-SEC-001
+    TC-SEC-005  Injection in imported code cannot escalate     -> REQ-SEC-005
+
+  HOME / EDIT / DATA
+    TC-HOME-002 Reorder, folder-create, long-press actions     -> REQ-HOME-002/003/004
+    TC-HOME-005 Delete removes bundle + scoped storage         -> REQ-HOME-005
+    TC-EDIT-004 Edited code re-validated before going live     -> REQ-EDIT-004
+    TC-DATA-004 Full library export + account/data delete      -> REQ-DATA-004/ACCT-004
+
+  BILLING
+    TC-PAY-003  Entitlements enforced server-side only         -> REQ-PAY-003
+    TC-PAY-004  Renew/cancel/refund update entitlement         -> REQ-PAY-004
+    TC-NFR-006  Per-user hard cost ceiling cannot be exceeded  -> REQ-NFR-006
+
+  PLATFORM / COMPLIANCE
+    TC-PLT-001  iOS build satisfies Doc 07 checklist           -> REQ-PLT-001
+    TC-PLT-002  Android build satisfies Doc 07 checklist       -> REQ-PLT-002
+    TC-PRIV-001 AI-data-sharing consent before first gen       -> REQ-PRIV-001
+    TC-PRIV-002 In-app report path feeds moderation            -> REQ-PRIV-002
+
+  NON-FUNCTIONAL
+    TC-NFR-002  Accessibility: dynamic type, VoiceOver/TalkBack -> REQ-NFR-002
+    TC-RUN-008  Launch-time p50/p90 on mid-tier device          -> REQ-RUN-008
+    TC-NFR-001  Backend failure degrades gracefully (no hang)   -> REQ-NFR-001
+
+--------------------------------------------------------------------------------
+6.4  DEVICE / ENVIRONMENT MATRIX
+--------------------------------------------------------------------------------
+
+  iOS: newest + newest-1 + newest-2 major versions; one small-screen, one
+  large-screen, one older mid-tier device. Android: 3-4 OS levels covering
+  >=90% of active devices; at least one low-RAM device (WebView performance).
+  Networks: wifi, cellular, offline, flaky (latency/packet-loss injection).
+
+--------------------------------------------------------------------------------
+6.5  RELEASE GATES (must all be GREEN to ship a build to production)
+--------------------------------------------------------------------------------
+
+  G1  Eval corpus success >= 85%; no disallowed pass; 0 escalation (6.2).
+  G2  All [M] requirement test cases passing on the device matrix.
+  G3  No open Sev-1/Sev-2 defects.
+  G4  Security review actions closed; no critical findings open.
+  G5  Store compliance checklist (Doc 07) signed by PM + mobile lead.
+  G6  Crash-free sessions >= 99.5% in beta; key flows within latency targets.
+  G7  Observability live: success, latency, cost/gen, crash, activation visible.
+
+--------------------------------------------------------------------------------
+6.6  DEFINITION OF DONE
+--------------------------------------------------------------------------------
+
+  PER STORY: code + tests merged; meets its REQ acceptance criteria; reviewed;
+  behind a flag if risky; docs/strings updated; no new lint/type errors.
+
+  PER FEATURE/SUBSYSTEM: Level-1 and Level-2 V&V passing; traceability updated
+  (REQ -> CMP -> test); telemetry emitting.
+
+  PER RELEASE: all release gates (6.5) green; rollback plan documented; staged
+  rollout configured.
+
+--------------------------------------------------------------------------------
+6.7  ONGOING POST-LAUNCH V&V
+--------------------------------------------------------------------------------
+
+  - Weekly eval run + cost review; new real-world failures added to the corpus.
+  - Continuous moderation review of reports (REQ-PRIV-002).
+  - Canary + staged rollout for every prompt/model change (these are "code"
+    too; a prompt change can regress quality and must pass G1).
+  - Quarterly security re-review; re-verify store-policy posture (policies
+    change — see Doc 07 change-watch).
+
+================================================================================
+  END OF DOCUMENT 06
+================================================================================

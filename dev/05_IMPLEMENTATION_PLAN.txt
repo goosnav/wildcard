@@ -1,0 +1,187 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 05 · IMPLEMENTATION PLAN, ESTIMATES & TIMELINE
+================================================================================
+
+  Maps to NASA "V": IMPLEMENTATION (bottom of the V). Work breakdown, size and
+  effort estimates, team, sequence, and milestones.
+  Status: BASELINE v1.0
+
+--------------------------------------------------------------------------------
+5.1  ESTIMATION METHOD & ASSUMPTIONS (read before trusting any number)
+--------------------------------------------------------------------------------
+
+  These are planning estimates, not commitments. Re-baseline after Phase 0.
+
+  A1. Stack = the recommended React Native + Node path (Doc 04). Fully-native
+      iOS+Android would add roughly 1.6-1.9x to MOBILE LOC/effort only.
+  A2. "LOC" = hand-authored, production source (excludes generated code, lockfiles,
+      vendored deps, and most config). It is a SIZING proxy, not a goal. Nobody
+      is paid by the line.
+  A3. Productivity = AI-ASSISTED blended net rate of ~50-70 LOC per engineer-day
+      (expected 60), inclusive of tests, code review, integration, and rework.
+      This assumes the team uses agentic coding tooling heavily (appropriate,
+      given what we are building). A non-AI-assisted team would be ~25-40
+      LOC/day and the timeline would roughly double.
+  A4. Engineer-day = one focused working day. Calendar accounts for ramp,
+      meetings, parallelism limits, and non-coding workstreams separately.
+  A5. The dominant SCHEDULE risk is store approval (Doc 07), not code volume.
+      The plan front-loads de-risking it.
+
+--------------------------------------------------------------------------------
+5.2  WORK BREAKDOWN STRUCTURE (WBS) WITH SIZE ESTIMATES
+--------------------------------------------------------------------------------
+
+  ID    Module / Workstream                         LOC (low / exp / high)
+  ----  ------------------------------------------  ----------------------
+  5.1   Mobile shared (RN/TS): home grid, folders,
+        drag + long-press, build view + live
+        preview, app runner host, navigation,
+        state, onboarding, settings, paywall UI,
+        source-view integration, API client ......  17,000 / 21,000 / 27,000
+  5.2   iOS native module: WebView config +
+        WebKit/JSCore sandbox hardening, host-
+        chrome Share/Export, StoreKit/Sign in
+        with Apple glue ...........................   2,300 /  3,000 /  4,000
+  5.3   Android native module: WebView, richer
+        permissioned capability bridge + consent,
+        Play Billing glue, host export ............   3,400 /  4,500 /  6,000
+  5.4   Backend services: auth, /generate +
+        streaming, orchestrator (CMP-03), model
+        gateway (CMP-04), import, apps/sync, billing
+        webhooks, reports, manifest, rate limits/
+        cost ceilings, admin ......................  12,000 / 15,000 / 19,000
+  5.5   Generation system: system prompts + few-
+        shot corpus, Runtime SDK + CMP-05 parity
+        shim, validation harness (Playwright),
+        repair loop, eval suite, Tier-2 agentic
+        orchestration (Agent SDK + sandbox) .......   4,500 /  6,000 /  8,500
+  5.6   Entitlements/billing integration logic
+        (RevenueCat wiring, server truth, quotas) .   1,500 /  2,000 /  3,000
+  5.7   Infra / IaC / CI-CD / observability /
+        sandbox pool management ...................   2,000 /  2,500 /  3,500
+  ----  ------------------------------------------  ----------------------
+        CORE TOTAL (GA, excl. optional web) .......  42,700 / 54,000 / 71,000
+
+  5.8   (Optional, Phase 4+) Web/PWA channel ......   6,000 /  7,500 / 10,000
+
+  Construction effort (expected 54,000 LOC @ 60 LOC/eng-day) ~= 900 eng-days.
+  Non-construction workstreams (added, not double-counted):
+     Product/PM coordination ............ ~1 FTE across the program
+     Product & UX design ................ ~120-160 eng-days (front-loaded)
+     Dedicated QA + device matrix + release testing ~ 220-320 eng-days
+     Store/compliance/legal coordination  ~ 60-100 eng-days + external legal
+     Security review / pentest .......... external + ~40 eng-days internal
+  TOTAL effort, order of magnitude ....... ~1,300-1,600 eng-days to GA.
+
+--------------------------------------------------------------------------------
+5.3  TEAM
+--------------------------------------------------------------------------------
+
+  GA "best version" team (~5-6 FTE):
+    - 1  Engineering Manager / PM (also owns store submissions + Doc 07)
+    - 1  Mobile lead (RN + iOS native)
+    - 1  Mobile/Android engineer (Android native + bridge)
+    - 2  Backend/AI engineers (orchestrator, model gateway, eval harness,
+         Tier-2 agentic) — this is the product's center of gravity
+    - 1  Product designer (full-time Phase 0-2, part-time after)
+    - 1  QA engineer (from Phase 1)
+  External as needed: legal/privacy counsel; a security firm for a pre-launch
+  pentest; optionally a launch/ASO contractor.
+
+  Lean revenue-first team (see 5.6): 2-3 builders + design help.
+
+--------------------------------------------------------------------------------
+5.4  PHASED TIMELINE & MILESTONES (GA "best version")
+--------------------------------------------------------------------------------
+
+  PHASE 0 — Discovery, design & store-risk de-risking ........ 3-4 weeks
+    - Lock Doc 01/02; finalize design system + key screens (figma).
+    - SPIKE: prove a generated HTML/JS tool runs in react-native-webview on a
+      real device, and that a skeleton app passes TestFlight + Play internal
+      review with the "scripting/automation, source-visible" posture (Doc 07).
+    - M0: Signed-off design + de-risk spike report. GO/NO-GO on store posture.
+      (If Apple posture looks blocked, pivot lead channel to web/PWA HERE,
+       before heavy spend — RSK-01.)
+
+  PHASE 1 — Walking skeleton (one true end-to-end path) ...... 6-8 weeks
+    - Auth-light, /generate Tier-1 single call -> validate -> live preview ->
+      Keep -> run on device. Minimal home grid. Backend + model gateway real.
+    - M1: A real, non-trivial tool generated from a prompt and run on a physical
+      phone through the production-shaped backend. First internal "wow."
+
+  PHASE 2 — iOS feature-complete + money + compliance ........ 8-10 weeks
+    - Home grid/folders/drag/long-press; source view + edit; edit-with-AI with
+      versioning; local store + encrypted sync; egress broker; paywall via
+      RevenueCat; content manifest + privacy disclosures + reporting; eval
+      harness v1 gating prompt changes.
+    - M2: iOS in TestFlight closed beta; passes internal Doc 07 checklist.
+
+  PHASE 3 — Android + Tier-2 agentic + eval hardening ........ 8-10 weeks
+    - Android build + richer consent-gated bridge; Tier-2 agentic builds
+      (Agent SDK + sandbox) raising hard-prompt success; eval suite >=200
+      prompts gating CI; cost dashboards.
+    - M3: Android internal testing; Tier-2 demonstrably lifts the hard subset.
+
+  PHASE 4 — Beta hardening, review cycles, launch ............ 4-6 weeks
+    - External pentest + fixes; performance + accessibility pass; store
+      submissions and review back-and-forth (budget 2-3 review rounds EACH);
+      staged rollout. Optional web/PWA channel kickoff.
+    - M4: Approved on BOTH stores; GA.
+    - M5 (post-launch): KPI dashboards live; first paying cohort; weekly eval +
+      cost review cadence established.
+
+  TOTAL: ~29-38 weeks (~7-9 months) to GA with a 5-6 person team.
+
+  Critical path: Phase 0 spike -> backend generation+validation -> iOS
+  compliance -> store review. Android and Tier-2 parallelize with backend once
+  the Tier-1 path is stable. The eval harness (5.5) is a dependency for safely
+  changing prompts/models and should exist by end of Phase 2.
+
+--------------------------------------------------------------------------------
+5.5  BUDGET — ORDER OF MAGNITUDE (heavily caveated)
+--------------------------------------------------------------------------------
+
+  Fully-loaded cost varies enormously by geography and whether this is an agency,
+  a funded startup, or a founder-led team. For planning only:
+
+    Agency / fully-loaded senior team:  ~$12k-$18k per engineer-month.
+      6 FTE x 8 months ~= $580k-$860k for the GA build (plus ~$10k-$40k external
+      legal/security and tooling).
+    Funded small startup (salaries):    materially less than agency rates.
+    Founder + 1-2 collaborators using heavy AI assistance: a fraction of the
+      above, trading calendar time for cost.
+
+  HONEST TENSION (must be surfaced to the sponsor): the GA "best version" is a
+  multi-hundred-thousand-dollar build if staffed as an agency project. The
+  stated business goal is "a couple thousand dollars, ideally consistent MRR"
+  (Doc 08). Those do not match. The rational reconciliation is in 5.6.
+
+--------------------------------------------------------------------------------
+5.6  RECOMMENDED RECONCILIATION — STAGE THE BEST VERSION
+--------------------------------------------------------------------------------
+
+  Build toward the GA spec, but ship value and TEST DEMAND first with a lean
+  slice, so spend is justified by traction rather than faith.
+
+  LEAN REVENUE-FIRST SLICE (Phases 0-1-2, iOS or web, Tier-1 only):
+    - Single platform (whichever the Phase 0 spike says is safest/fastest;
+      a web/PWA launch sidesteps store review entirely and is the fastest path
+      to a paying user — strongly consider it as the FIRST channel).
+    - Tier-1 generation, live preview, keep/run, home grid, source view,
+      edit-with-AI, paywall.
+    - NO Tier-2, NO second platform, NO sync-across-devices yet.
+    - Team: 2-3 builders + design help. Calendar: ~3-4 months.
+    - Goal: reach the first ~200-300 paying subscribers (= the "couple thousand
+      MRR" target, Doc 08) and learn what tools people actually make.
+
+  THEN fund Phases 3-4 (Android, Tier-2, full polish, both stores) out of
+  traction. This is the same architecture throughout (Doc 03/04), so nothing is
+  thrown away — the lean slice IS the first two-thirds of the best version.
+
+  This staging is a recommendation, not a requirement; the sponsor may choose to
+  fund the full GA build up front. Either way the specs are identical.
+
+================================================================================
+  END OF DOCUMENT 05
+================================================================================

@@ -1,0 +1,26 @@
+{
+  "name": "@wildcard/runtime",
+  "version": "0.0.0",
+  "description": "The WC.* Runtime SDK + sandbox host. Shared across web and iOS.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:global": "esbuild src/index.ts --bundle --format=iife --global-name=WildcardRuntime --outfile=dist/runtime.global.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build:global",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

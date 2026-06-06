@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Tip Splitter</title>
+  <style>
+    :root { color-scheme: light dark; --accent: #5b8cff; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      font: 16px/1.4 -apple-system, system-ui, sans-serif;
+      background: Canvas; color: CanvasText;
+    }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    label { display: block; font-size: 13px; opacity: 0.7; margin: 14px 0 4px; }
+    input { width: 100%; padding: 12px; font-size: 17px; border: 1px solid #8884;
+            border-radius: 12px; background: Field; color: FieldText; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .out { margin-top: 22px; padding: 18px; border-radius: 16px;
+           background: color-mix(in srgb, var(--accent) 14%, transparent); }
+    .out .big { font-size: 34px; font-weight: 700; }
+    .out .sub { opacity: 0.7; font-size: 14px; margin-top: 2px; }
+    button { margin-top: 18px; width: 100%; padding: 14px; font-size: 16px;
+             font-weight: 600; border: 0; border-radius: 12px;
+             background: var(--accent); color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Tip Splitter</h1>
+
+  <label for="bill">Bill amount ($)</label>
+  <input id="bill" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+
+  <div class="row">
+    <div>
+      <label for="tip">Tip %</label>
+      <input id="tip" type="number" inputmode="numeric" min="0" step="1" value="18" />
+    </div>
+    <div>
+      <label for="people">People</label>
+      <input id="people" type="number" inputmode="numeric" min="1" step="1" value="2" />
+    </div>
+  </div>
+
+  <div class="out">
+    <div class="big" id="perPerson">$0.00</div>
+    <div class="sub" id="detail">per person</div>
+  </div>
+
+  <button id="save">Save this split</button>
+
+  <script>
+    var bill = document.getElementById("bill");
+    var tip = document.getElementById("tip");
+    var people = document.getElementById("people");
+    var perPerson = document.getElementById("perPerson");
+    var detail = document.getElementById("detail");
+
+    function money(n) { return "$" + (Math.round(n * 100) / 100).toFixed(2); }
+
+    function recompute() {
+      var b = parseFloat(bill.value) || 0;
+      var t = parseFloat(tip.value) || 0;
+      var p = Math.max(1, parseInt(people.value, 10) || 1);
+      var total = b * (1 + t / 100);
+      var each = total / p;
+      perPerson.textContent = money(each);
+      detail.textContent = money(total) + " total · " + p + " people · " + t + "% tip";
+      return { bill: b, tipPct: t, people: p, total: total, each: each };
+    }
+
+    [bill, tip, people].forEach(function (el) {
+      el.addEventListener("input", recompute);
+    });
+
+    // Restore the last-used tip % from this tool's private storage.
+    WC.storage.get("lastTipPct").then(function (v) {
+      if (v != null) { tip.value = v; recompute(); }
+    });
+
+    document.getElementById("save").addEventListener("click", function () {
+      var state = recompute();
+      WC.storage.set("lastTipPct", state.tipPct);
+      // Hand the result up to the host, which owns Share/Export.
+      WC.output(
+        "Each person pays " + money(state.each) + " (" + money(state.total) + " total)",
+        { label: "Tip split", filename: "tip-split.txt" }
+      );
+      WC.ui.toast("Saved");
+    });
+
+    recompute();
+  </script>
+</body>
+</html>

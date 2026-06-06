@@ -1,0 +1,254 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 04 · TECH STACK & INTERFACES
+================================================================================
+
+  Maps to NASA "V": COMPONENT DETAILED DESIGN. Concrete tools, the generation
+  engine, the on-device Runtime SDK, and the backend API contract.
+  Status: BASELINE v1.0
+
+  Pricing & SDK note: model prices and SDK version numbers below were current
+  as of mid-2026 and MUST be re-verified at project start (OQ-03). They drive
+  Doc 08 economics; treat them as inputs, not constants.
+
+--------------------------------------------------------------------------------
+4.1  RECOMMENDED STACK AT A GLANCE
+--------------------------------------------------------------------------------
+
+  MOBILE HOST (CMP-01/02/07c/08)
+    Framework ....... React Native (RN CLI or Expo bare workflow), TypeScript.
+                      Rationale: one shared codebase for the ~80% that is common
+                      UI + flow, with thin native modules where iOS and Android
+                      diverge (capability model, IAP, share). Halves duplicate
+                      work versus two fully-native apps while keeping native
+                      control where it matters.
+    Alternative ..... Fully native (SwiftUI + Kotlin/Compose) if maximum polish
+                      is worth ~1.6-1.9x the mobile build cost (Doc 05). Same
+                      architecture; more code.
+    WebView ......... react-native-webview (wraps WKWebView on iOS, Android
+                      System WebView/Chromium on Android).
+    Code editor ..... CodeMirror 6 hosted in a WebView (lightweight, mobile-
+                      friendly) for the source view/edit (REQ-EDIT-*).
+    Navigation ...... React Navigation.   State: Zustand (small, predictable).
+    Local store ..... SQLite (op-sqlite or WatermelonDB) for metadata; app
+                      bundles on the device filesystem keyed by hash.
+    IAP ............. RevenueCat over StoreKit 2 (iOS) and Play Billing
+                      (Android). Strongly recommended: it abstracts receipts,
+                      renewals, and entitlements across BOTH stores and removes
+                      most of CMP-09's client/edge work.
+    Auth client ..... Sign in with Apple, Google Sign-In, email.
+
+  BACKEND (CMP-03/04/05/07s/09/10/11/12/13)
+    Runtime ......... Node.js + TypeScript. HTTP: Fastify or Hono.
+    DB .............. PostgreSQL (managed; e.g. Supabase/Neon). Cache + rate
+                      limit + locks: Redis. Job queue: BullMQ (Redis) or SQS.
+    Object storage .. S3 or Cloudflare R2 for app bundles + assets.
+    LLM access ...... Anthropic API via official SDK (CMP-04).
+    Agentic builds .. Claude Agent SDK (@anthropic-ai/claude-agent-sdk) running
+                      inside an ephemeral sandbox provider (CMP-06; see 4.4).
+    Validation ...... Playwright (headless Chromium) for the eval harness
+                      (CMP-05; see 4.5). Runtime parity layer mirrors the device
+                      Runtime SDK.
+    Auth/identity ... Managed auth (Clerk or Supabase Auth) or custom JWT.
+    Observability ... OpenTelemetry traces/metrics/logs -> Grafana or Datadog.
+    Hosting ......... Containers on Fly.io / Render / AWS ECS; sandboxes per 4.4.
+
+  WEB/PWA (optional, Phase 4+, CMP per Doc 03 §3 PLT-004)
+    Same Runtime SDK and bundle format reused in a browser shell. Doubles as a
+    store-risk fallback distribution channel (Doc 07).
+
+--------------------------------------------------------------------------------
+4.2  MODEL STRATEGY (cost-aware routing — REQ-GEN-009)
+--------------------------------------------------------------------------------
+
+  Current-generation candidates and indicative list prices (per million tokens,
+  input/output; RE-VERIFY at start):
+
+    Haiku  (claude-haiku-4-5) ......... ~$1 / ~$5    fast, cheap
+    Sonnet (claude-sonnet-4-6) ........ ~$3 / ~$15   the workhorse
+    Opus   (claude-opus-4-x, current).. ~$5 / ~$25   hardest builds
+
+  Cost levers we WILL use:
+    - Prompt caching: the large static prefix (system prompt + Runtime SDK
+      reference + few-shot examples) is cached, cutting cached-input cost by up
+      to ~90% on repeat calls. This is the single biggest COGS lever.
+    - Batch API (50% off): NOT for interactive generation, but used for the
+      offline regression eval suite (Doc 06) and any bulk re-validation.
+
+  Routing policy (implemented in CMP-03):
+    - A cheap classifier (Haiku) labels each prompt: {simple, standard, hard,
+      disallowed}.
+    - simple/standard -> Tier-1 on Sonnet (Haiku for the very simplest).
+    - Repair turns -> Haiku or Sonnet (cheap, targeted fixes).
+    - hard, or Tier-1 exhausted -> Tier-2 (Sonnet first; Opus if Sonnet stalls).
+    - disallowed -> refuse with alternative (REQ-GEN-007).
+  Goal: lowest cost per SUCCESSFUL generation, not lowest cost per call.
+
+--------------------------------------------------------------------------------
+4.3  TIER-1 GENERATION ENGINE (CMP-03 + CMP-04 + CMP-05)
+--------------------------------------------------------------------------------
+
+  Pseudoflow:
+
+    classify(prompt) -> class
+    if class == disallowed: return refusal_with_alternative()
+    sys = cached_system_prompt + runtime_sdk_reference + few_shot_examples
+    candidate = model.generate(sys, prompt)          # streamed to preview
+    for turn in 1..N (default 3):
+        result = validate(candidate)                 # CMP-05, headless runtime
+        if result.pass: break
+        candidate = model.repair(sys, candidate, result.errors)
+    if not result.pass: return honest_failure_with_reduced_scope_offer()
+    return sign_and_package(candidate)
+
+  System-prompt design (the "prompt engineering" the founder asked about):
+    - Role: "You produce ONE self-contained mini-app as files (index.html [+
+      app.js/app.css]) that runs in the Wild Card WebView runtime."
+    - Hard rules: no external code fetch; only the WC.* Runtime SDK for storage/
+      output/capabilities; no direct native calls; allow-list any data origins
+      and DECLARE them; keep it small and single-purpose; make it look clean and
+      native (design tokens supplied).
+    - Output contract: a strict, machine-parseable response (e.g. files in a
+      defined fenced format or JSON) so packaging is deterministic.
+    - Few-shot: 3-5 exemplar tools spanning the catalog (a calculator, a tracker
+      with WC.storage, a generator, an API-calling lookup).
+    - Self-check: the model lists the capabilities it used; CMP-03 cross-checks
+      against the allowed set before delivery.
+
+--------------------------------------------------------------------------------
+4.4  TIER-2 AGENTIC BUILD (CMP-06) — where "Claude Code" lives
+--------------------------------------------------------------------------------
+
+  Tool: the Claude Agent SDK (the same engine behind Claude Code, exposed as a
+  Python/TypeScript library). It gives an agent the loop, the built-in tools
+  (read files, run commands, edit code), and context management, programmatically.
+  It must be used with API-key authentication for a product serving end users
+  (NOT claude.ai login), and its use to power your product is governed by
+  Anthropic's Commercial Terms — confirm licensing at start (OQ-04).
+
+  How we run it:
+    1. CMP-06 provisions an EPHEMERAL sandbox (E2B is purpose-built for AI code
+       sandboxes; Modal, Daytona, or Fly Machines are alternatives). The sandbox
+       has a real filesystem, Node, and a headless browser (Playwright).
+    2. Seed the sandbox with: the target spec (derived from the user's prompt),
+       a stub of the Runtime SDK, exemplar tools, and a GENERATED ACCEPTANCE
+       TEST describing "done."
+    3. Drive the agent (TypeScript example shape):
+
+         import { query } from "@anthropic-ai/claude-agent-sdk";
+         for await (const msg of query({
+           prompt: buildSpecPrompt(userRequest),
+           options: {
+             model: "sonnet",              // escalate to "opus" on stall
+             allowedTools: ["Read","Write","Edit","Glob","Bash"],
+             maxTurns: 60,                 // hard ceiling (cost guardrail)
+             // hooks: gate/observe tool calls; mcpServers: optional extensions
+           }
+         })) { /* stream progress to phone; collect result */ }
+
+    4. The agent writes the app, runs it, reads errors from the headless
+       browser, fixes, and repeats until the acceptance test is green or the
+       iteration/cost ceiling is hit. (This is the disciplined version of a
+       "keep-going-until-it-works" loop: BOUNDED and gated by a real test.)
+    5. On green: export the bundle -> CMP-05 final validation -> sign -> ship.
+       On ceiling: return the best partial plus an honest reduced-scope offer.
+
+  Why server-side: the agent needs a computer (FS, shell, browser) to iterate.
+  The phone cannot and should not provide that. The phone runs only the result.
+
+--------------------------------------------------------------------------------
+4.5  VALIDATION / EVAL HARNESS (CMP-05) — the quality backbone
+--------------------------------------------------------------------------------
+
+  Per-candidate validation (blocks delivery — REQ-GEN-002/010):
+    - Static checks: parses; CSP-clean; no forbidden APIs; declared capabilities
+      subset of allowed; bundle size sane.
+    - Dynamic check: load index.html in headless Chromium under the SAME Runtime
+      SDK shim and CSP/egress policy the device uses. Confirm: no fatal console
+      errors on load; a generated smoke test exercising the core function passes;
+      no disallowed network attempts.
+    - Output: {pass: bool, errors: [...], capabilities_used: [...]} fed to the
+      repair loop or to packaging.
+
+  Offline regression eval suite (Doc 06):
+    - A versioned corpus of >=200 representative prompts with expected behaviors.
+    - Runs on every model/prompt change (Batch API, 50% off). Tracks success
+      rate, latency, cost. Gate: no prompt or model change ships if it regresses
+      success on the corpus beyond a set threshold.
+
+--------------------------------------------------------------------------------
+4.6  THE ON-DEVICE RUNTIME SDK (CMP-02) — the surface every app gets
+--------------------------------------------------------------------------------
+
+  Injected into each app's WebView context as a global `WC`. Fixed at HOST build
+  time (not negotiable by app content). Mirrored exactly in CMP-05's shim.
+
+  WC.storage                  (REQ-RUN-003)
+     .get(key) -> value | null
+     .set(key, value)         persistent, scoped to this app, optionally synced
+     .remove(key)
+     .keys() -> [string]
+
+  WC.output(result, meta?)    (REQ-RUN-004) hand a result (text/data/blob) to
+     the host; the host renders it and shows host-owned Share/Export. The ONLY
+     sanctioned way for an app to "produce a file" on iOS.
+
+  WC.ui                       small helpers for a consistent native feel:
+     .toast(msg)  .confirm(msg)->bool  .pickFromList(items)->item
+     (Pure in-WebView UI; no native escalation.)
+
+  WC.net.fetch(url, opts)     network, but ONLY to origins the app DECLARED and
+     that the Egress Broker allow-listed (REQ-RUN-005). Anything else throws.
+
+  WC.capabilities             PLATFORM-DEPENDENT, present only where allowed:
+     iOS: effectively empty beyond the above (4.7.2).
+     Android (opt-in, per-use consent — REQ-RUN-006): e.g.
+        .exportFile(name, content)   .share(payload)   .clipboard.write(text)
+     Calls resolve only after the user grants consent for that use.
+
+  WC.meta                     { appId, version }  (read-only)
+
+  Design rule: if a tool wants something not on this surface, it cannot have it
+  in v1. The surface is how we keep untrusted code safe and stores happy.
+
+--------------------------------------------------------------------------------
+4.7  BACKEND API CONTRACT (host <-> backend; all require auth except *)
+--------------------------------------------------------------------------------
+
+  POST /v1/auth/session*        exchange provider token -> session JWT
+  GET  /v1/me                   profile + entitlement snapshot
+
+  POST /v1/generate             { prompt, mode?: auto|tier1|tier2 }
+       -> streamed: progress events, preview chunks, final { bundleId, manifest }
+       (server enforces quota/credits BEFORE work — REQ-PAY-003)
+  POST /v1/generate/{id}/repair { instruction }        # "edit with AI"
+  POST /v1/import               { source | uploadRef } -> validated bundle
+  GET  /v1/bundles/{id}         signed download of a bundle (for sync/restore)
+
+  POST /v1/apps                 register kept app (metadata) ; PATCH rename/move
+  DELETE /v1/apps/{id}          delete app + server-side data (REQ-DATA-004)
+  POST /v1/sync                 push/pull library + opted-in app data (encrypted)
+
+  POST /v1/billing/webhook*     store server notifications (renew/cancel/refund)
+  POST /v1/reports              { appId|outputRef, reason }   (REQ-PRIV-002)
+
+  GET  /v1/manifest*            content manifest for store review (CMP-12; Doc 07)
+
+  Errors: typed, user-safe messages; never leak provider/internal detail
+  (REQ-NFR-001, REQ-SEC). Rate limits + cost ceilings enforced at this layer.
+
+--------------------------------------------------------------------------------
+4.8  ENVIRONMENTS & PIPELINE
+--------------------------------------------------------------------------------
+
+  Environments: dev -> staging -> production, each with isolated keys, DBs, and
+  sandbox pools. Generated-bundle store is per-environment.
+  CI/CD: lint + typecheck + unit tests on PR; eval suite (CMP-05) on changes to
+  prompts/models; mobile builds via EAS/Fastlane to TestFlight + Play internal
+  testing; staged rollout on both stores.
+  Secrets: provider keys and signing keys in a managed secret store; never in
+  client config or VCS.
+
+================================================================================
+  END OF DOCUMENT 04
+================================================================================
