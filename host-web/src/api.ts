@@ -1,6 +1,7 @@
-// Client for the server's /v1/generate SSE stream. Emits each generation event
-// as it arrives (so the build view can show live progress), and resolves with
-// the final result (the validated bundle, or an honest failure reason).
+// Client for the server API: magic-link auth, the /v1/generate SSE stream,
+// quota, and Stripe checkout. The session bearer token lives in localStorage and
+// is attached to every authenticated call. The server is the source of truth for
+// quota — we just render what it returns and gate the UI off `canBuild`.
 
 import type { Bundle } from "@wildcard/runtime";
 
@@ -11,11 +12,109 @@ export type GenEvent =
   | { type: "done"; bundle: Bundle }
   | { type: "failed"; reason: string };
 
-export type GenResult =
-  | { ok: true; manifest: Bundle["manifest"]; files: Bundle["files"] }
-  | { ok: false; reason: string };
+export interface Quota {
+  plan: "free" | "pro";
+  buildsUsed: number;
+  buildsLimit: number | null;
+  remaining: number | null;
+  canBuild: boolean;
+}
 
-/** Parse a raw SSE buffer into `{event, data}` records, returning the leftover. */
+export interface AuthUser {
+  id: string;
+  email: string;
+  quota: Quota;
+}
+
+export type GenResult =
+  | { ok: true; manifest: Bundle["manifest"]; files: Bundle["files"]; quota: Quota }
+  | { ok: false; reason: string; quota?: Quota; paywall?: boolean };
+
+// --- session token ---
+
+const SESSION_KEY = "wc.session";
+
+export function getSession(): string | null {
+  return localStorage.getItem(SESSION_KEY);
+}
+function setSession(token: string): void {
+  localStorage.setItem(SESSION_KEY, token);
+}
+function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function authHeaders(): Record<string, string> {
+  const t = getSession();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+// --- auth ---
+
+export async function requestMagicLink(
+  email: string
+): Promise<{ emailed: boolean; devLink?: string }> {
+  const res = await fetch("/v1/auth/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error ?? "Couldn't send the sign-in link.");
+  }
+  return res.json();
+}
+
+export async function verifyMagicLink(token: string): Promise<AuthUser> {
+  const res = await fetch("/v1/auth/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) throw new Error("That sign-in link is invalid or expired.");
+  const { sessionToken, user } = await res.json();
+  setSession(sessionToken);
+  return user as AuthUser;
+}
+
+/** Resolve the current user from the stored session, or null if not signed in. */
+export async function getMe(): Promise<AuthUser | null> {
+  if (!getSession()) return null;
+  const res = await fetch("/v1/me", { headers: { ...authHeaders() } });
+  if (res.status === 401) {
+    clearSession();
+    return null;
+  }
+  if (!res.ok) return null;
+  const { user } = await res.json();
+  return user as AuthUser;
+}
+
+export async function logout(): Promise<void> {
+  await fetch("/v1/auth/logout", { method: "POST", headers: { ...authHeaders() } }).catch(
+    () => {}
+  );
+  clearSession();
+}
+
+// --- billing ---
+
+export async function startCheckout(): Promise<
+  { ok: true; url: string } | { ok: false; reason: "unconfigured" | "error"; message: string }
+> {
+  const res = await fetch("/v1/billing/checkout", {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  if (res.ok) return { ok: true, ...(await res.json()) };
+  const j = await res.json().catch(() => ({}));
+  if (res.status === 503) return { ok: false, reason: "unconfigured", message: j.error ?? "" };
+  return { ok: false, reason: "error", message: j.error ?? "Checkout failed." };
+}
+
+// --- generation ---
+
 function drainEvents(
   buffer: string
 ): { events: { event: string; data: string }[]; rest: string } {
@@ -41,9 +140,15 @@ export async function generate(
 ): Promise<GenResult> {
   const res = await fetch("/v1/generate", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ prompt }),
   });
+
+  // Quota exhausted — surface the paywall instead of throwing.
+  if (res.status === 402) {
+    const j = await res.json().catch(() => ({}));
+    return { ok: false, reason: "free_limit", quota: j.quota, paywall: true };
+  }
 
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");

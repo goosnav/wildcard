@@ -41,6 +41,9 @@ Thumbs.db
 # ---- Claude Code (keep shareable launch.json; ignore per-user local state) ----
 .claude/settings.local.json
 
+# ---- Local data store (JSON-file persistence for the v1 lean slice) ----
+.data/
+
 # ---- Misc ----
 appengine-generated/
 *.local
