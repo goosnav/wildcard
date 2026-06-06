@@ -19,7 +19,9 @@ export interface ValidationResult {
 
 let browserPromise: Promise<Browser> | null = null;
 function getBrowser(): Promise<Browser> {
-  if (!browserPromise) browserPromise = chromium.launch();
+  // `channel: "chromium"` uses the full Chromium build with the new headless
+  // mode, avoiding the separate chromium-headless-shell download.
+  if (!browserPromise) browserPromise = chromium.launch({ channel: "chromium" });
   return browserPromise;
 }
 
@@ -63,6 +65,12 @@ export async function validate(
 
   try {
     await page.setContent("<!doctype html><html><body><div id='stage'></div></body></html>");
+    // esbuild (via tsx) injects calls to a `__name` helper into the inlined
+    // page.evaluate closure below when keepNames is on. That helper isn't
+    // defined in the page, so define a passthrough before evaluating.
+    await page.addScriptTag({
+      content: "globalThis.__name = globalThis.__name || ((target) => target);",
+    });
     await page.addScriptTag({ content: runtimeSrc });
 
     const wcErrors: string[] = await page.evaluate(

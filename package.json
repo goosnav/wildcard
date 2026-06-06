@@ -5,7 +5,8 @@
   "description": "Describe a tool, get a working tool. Monorepo root.",
   "workspaces": [
     "runtime",
-    "server"
+    "server",
+    "host-web"
   ],
   "engines": {
     "node": ">=20"

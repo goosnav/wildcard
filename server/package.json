@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dryrun": "tsx scripts/dryrun.ts",
+    "livegen": "tsx scripts/livegen.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",

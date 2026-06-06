@@ -93,10 +93,21 @@ npm --workspace @wildcard/runtime test
 # 4. Run the server (generation) tests — no API key required
 npm --workspace @wildcard/server test
 
-# 5. Run the generation server locally (needs an Anthropic key)
+# 5. Exercise the full generation pipeline offline (stub model + real validator)
+npm --workspace @wildcard/server run dryrun
+
+# 6. Run the generation server locally (needs a provider key — see below)
 cp .env.example .env   # then edit .env
 npm --workspace @wildcard/server run dev
 ```
+
+### Generation provider
+
+The server reads its key **server-side only** (REQ-SEC-001) and prefers
+**OpenRouter** when `OPENROUTER_API_KEY` is set, otherwise it falls back to
+`ANTHROPIC_API_KEY`. Set `WC_MODEL` to a slug your provider understands
+(OpenRouter: `anthropic/claude-sonnet-4`; Anthropic: `claude-sonnet-4-6`).
+Smoke-test a live generation with `npm --workspace @wildcard/server run livegen -- "a tip splitter"`.
 
 Generate a tool against the local server:
 
