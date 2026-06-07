@@ -61,15 +61,23 @@ wildcard/
 │   ├── tools/      Hand-written example tool bundles (e.g. tip-splitter).
 │   └── test/       Playwright harness proving isolation, persistence, egress.
 │
-├── server/         Generation backend (CMP-03/04/05).
+├── server/         Generation backend + accounts/billing (CMP-03/04/05).
 │   ├── src/        contract.ts (strict output → bundle), generate.ts (orchestrator
 │   │               + bounded repair loop), validate.ts (headless-Chromium gate),
-│   │               anthropic-model.ts (model gateway + prompt caching), server.ts
+│   │               openrouter-/anthropic-model.ts (model gateways, 429 retry),
+│   │               store.ts (JSON-file persistence), auth.ts (magic-link),
+│   │               quota.ts (free-build limit), stripe.ts + billing.ts (checkout
+│   │               + signed webhook), email.ts (Resend/dev link), server.ts (Hono)
 │   ├── prompts/    system.md — the generation system prompt.
-│   └── test/       Repair-loop + contract tests (no API key needed).
+│   └── test/       Quota + repair-loop/contract tests (no API key needed).
 │
-├── host-web/       (Phase 1) React PWA shell: home grid, prompt bar, build view.
-├── eval/           (Phase 1) Regression eval corpus + runner.
+├── host-web/       React + Vite PWA shell: sign-in, home grid, prompt bar, build
+│                   view, tool runner (sandboxed iframe), source view, paywall.
+│   ├── src/        App.tsx, api.ts (server client), components/, idb.ts (local
+│   │               tool store), main.tsx; public/ has the PWA manifest + SW.
+│
+├── eval/           Regression eval: corpus.jsonl + run.ts (scores first-try +
+│                   overall pass through the real pipeline; gates on a threshold).
 └── dev/            The product specification ("app bible", read-only reference).
 ```
 
@@ -99,7 +107,16 @@ npm --workspace @wildcard/server run dryrun
 # 6. Run the generation server locally (needs a provider key — see below)
 cp .env.example .env   # then edit .env
 npm --workspace @wildcard/server run dev
+
+# 7. In another terminal, run the web app (Vite dev server on :5173, proxies /v1
+#    to the server on :8787). Sign in with any email — without RESEND_API_KEY the
+#    server prints the magic link and the UI shows a one-tap "Continue (dev)".
+npm --workspace @wildcard/host-web run dev
 ```
+
+No provider key handy? Run the whole stack offline with the deterministic stub
+model: `WC_PROVIDER=stub` in front of the server (and the eval runner) returns a
+fixed valid tool through the real validator — good for UI work and CI.
 
 ### Generation provider
 
@@ -115,6 +132,19 @@ Generate a tool against the local server:
 curl -N -X POST http://localhost:8787/v1/generate \
   -H 'content-type: application/json' \
   -d '{"prompt":"a tip splitter that remembers my usual tip %"}'
+```
+
+### Quality eval
+
+`npm run eval` generates every prompt in `eval/corpus.jsonl` through the **same**
+orchestrator + validator the server uses, then scores first-try and overall pass
+rate, latency, and a per-category breakdown, writing a report to `eval/reports/`.
+It exits non-zero below `EVAL_MIN_PASS_RATE` so it can gate CI. To test without
+spending, point it at a free OpenRouter model (slug ending in `:free`):
+
+```bash
+WC_MODEL=openai/gpt-oss-120b:free npm run eval -- --concurrency 1   # free tiers rate-limit
+WC_PROVIDER=stub npm run eval                                       # offline plumbing check
 ```
 
 ---
@@ -161,6 +191,13 @@ preserve.
 
 ## Status
 
-Phase 0 spike — proving the spine end-to-end (runtime isolation + generation +
-validator-gated repair). See the build plan and the `dev/` bible for the full
-roadmap. Working title "Wild Card" pending a trademark/name check (OQ-01).
+**Lean web slice — functionally complete.** The spine runs end-to-end: runtime
+isolation, Tier-1 generation with a validator-gated repair loop, a React PWA
+shell, local-first tool storage, magic-link accounts, a server-enforced free-build
+quota, and a Stripe paywall — with a regression eval harness gating quality. Live
+first-try success on the starter corpus is ~92% (above the 85% target).
+
+Still ahead: server-proxied data providers, prompt-cache cost tuning, a larger
+eval corpus, and the eventual React Native wrap for iOS/Android. See the build
+plan and the `dev/` bible for the full roadmap. Working title "Wild Card" pending
+a trademark/name check (OQ-01).
