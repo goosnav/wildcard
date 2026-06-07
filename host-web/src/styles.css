@@ -391,6 +391,35 @@ body {
   font-size: 13px;
 }
 .source-tab.active { color: var(--text); background: var(--panel); }
+.source-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; padding: 6px 10px; }
+.source-revert,
+.source-save {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.source-revert { background: none; color: var(--muted); }
+.source-save { background: var(--accent, #7c5cff); color: #fff; border-color: transparent; }
+.source-revert:disabled,
+.source-save:disabled { opacity: 0.45; cursor: default; }
+.source-editor {
+  flex: 1;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  resize: vertical;
+  min-height: 320px;
+  max-height: 70vh;
+  background: var(--panel);
+  color: #d6d8ea;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  tab-size: 2;
+  outline: none;
+}
 .source-code {
   margin: 0;
   padding: 16px;

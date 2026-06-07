@@ -138,6 +138,15 @@ export default function App() {
     setTools((prev) => prev.filter((t) => t.manifest.id !== tool.manifest.id));
   }
 
+  // Persist a hand-edited source bundle and re-run it. Same manifest id, so the
+  // tool keeps its place on the grid and its WC.storage data (REQ-EDIT-004).
+  async function saveToolSource(tool: SavedTool, files: SavedTool["files"]) {
+    const updated: SavedTool = { ...tool, files };
+    await putTool(updated);
+    setTools((prev) => prev.map((t) => (t.manifest.id === tool.manifest.id ? updated : t)));
+    setView({ name: "run", tool: updated, tab: "run" });
+  }
+
   async function signOut() {
     await logout();
     setUser(null);
@@ -232,7 +241,10 @@ export default function App() {
             {view.tab === "run" ? (
               <ToolRunner bundle={view.tool} />
             ) : (
-              <SourceView bundle={view.tool} />
+              <SourceView
+                bundle={view.tool}
+                onSave={(files) => saveToolSource(view.tool, files)}
+              />
             )}
           </div>
         )}
