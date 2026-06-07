@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   generate,
   getMe,
+  getManifest,
   verifyMagicLink,
   logout,
   getSession,
   type GenEvent,
   type AuthUser,
   type Quota,
+  type AppManifest,
 } from "./api";
 import {
   getAllTools,
@@ -38,7 +40,13 @@ export default function App() {
   const [lines, setLines] = useState<BuildLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [manifest, setManifest] = useState<AppManifest | null>(null);
   const booted = useRef(false);
+
+  // Public app config (version, live-data catalog, feature flags). Best-effort.
+  useEffect(() => {
+    getManifest().then(setManifest);
+  }, []);
 
   // Bootstrap auth: complete a magic-link sign-in, refresh after checkout, or
   // resolve the existing session. Then scrub one-time params from the URL.
@@ -229,6 +237,18 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {manifest && (
+        <footer className="appfoot">
+          <span>Wild Card v{manifest.version}</span>
+          {manifest.providers.length > 0 && (
+            <span title={manifest.providers.map((p) => p.label).join(", ")}>
+              · {manifest.providers.length} live-data source
+              {manifest.providers.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </footer>
+      )}
 
       {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
     </div>

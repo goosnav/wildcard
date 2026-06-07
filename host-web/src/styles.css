@@ -183,6 +183,16 @@ body {
   padding-bottom: 24px;
 }
 
+.appfoot {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0 8px;
+  font-size: 12px;
+  color: var(--muted, #8a8a9a);
+  opacity: 0.7;
+}
+
 /* Prompt bar */
 .promptbar {
   display: flex;

@@ -11,7 +11,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { generateTool, type GenEvent } from "./generate.js";
 import { closeValidator } from "./validate.js";
@@ -29,8 +29,8 @@ import {
   backendName,
   type User,
 } from "./store.js";
-import { quotaFor, publicUser } from "./quota.js";
-import { isAdminEmail, adminOverview } from "./admin.js";
+import { quotaFor, publicUser, FREE_BUILD_LIMIT } from "./quota.js";
+import { isAdminEmail, adminOverview, MONTHLY_PRICE_USD } from "./admin.js";
 import { providerCatalog, callProvider } from "./providers.js";
 import { classifyPrompt } from "./safety.js";
 import {
@@ -147,6 +147,19 @@ app.get("/v1/admin/overview", async (c) => {
   if (admin instanceof Response) return admin;
   return c.json(await adminOverview());
 });
+
+// Public app manifest (Doc 04 §4.7): everything the client needs to configure
+// itself without hardcoding — version, the free-build allowance, price, the
+// live-data catalog, and which optional features are wired. No auth, no secrets.
+app.get("/v1/manifest", (c) =>
+  c.json({
+    version: process.env.WC_VERSION ?? process.env.npm_package_version ?? "0.0.0",
+    freeBuildLimit: FREE_BUILD_LIMIT,
+    priceUsd: MONTHLY_PRICE_USD,
+    providers: providerCatalog(),
+    features: { billing: stripe.isConfigured(), email: emailConfigured() },
+  })
+);
 
 // --- data providers (server-proxied egress; REQ-RUN-005) ---
 
@@ -321,30 +334,40 @@ if (WEB_DIR) {
   }
 }
 
-const port = Number(process.env.PORT ?? 8787);
-const server = serve({ fetch: app.fetch, port });
-backendName().then((store) =>
-  console.log(
-    `Wild Card generation server on http://localhost:${port} ` +
-      `(provider: ${activeProviderName()}, store: ${store})`
-  )
-);
+// The configured Hono app, exported so route-level tests can call app.request()
+// without binding a socket. The network listener + lifecycle below only run when
+// this module is the process entrypoint (not when imported by a test).
+export { app };
 
-// Graceful shutdown: close the headless Chromium the validator manages (an
-// otherwise-unmanaged subprocess) and stop accepting connections, so a
-// container stop/redeploy doesn't leak a browser process.
-let shuttingDown = false;
-async function shutdown(signal: string): Promise<void> {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`[shutdown] ${signal} received — closing validator + server`);
-  try {
-    await closeValidator();
-  } catch (e) {
-    console.error("[shutdown] validator close failed:", e);
-  }
-  server.close();
-  process.exit(0);
+const isEntrypoint =
+  !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
+  const port = Number(process.env.PORT ?? 8787);
+  const server = serve({ fetch: app.fetch, port });
+  backendName().then((store) =>
+    console.log(
+      `Wild Card generation server on http://localhost:${port} ` +
+        `(provider: ${activeProviderName()}, store: ${store})`
+    )
+  );
+
+  // Graceful shutdown: close the headless Chromium the validator manages (an
+  // otherwise-unmanaged subprocess) and stop accepting connections, so a
+  // container stop/redeploy doesn't leak a browser process.
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[shutdown] ${signal} received — closing validator + server`);
+    try {
+      await closeValidator();
+    } catch (e) {
+      console.error("[shutdown] validator close failed:", e);
+    }
+    server.close();
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 }
-process.on("SIGTERM", () => void shutdown("SIGTERM"));
-process.on("SIGINT", () => void shutdown("SIGINT"));

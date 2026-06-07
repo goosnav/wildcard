@@ -135,6 +135,35 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   return res.json();
 }
 
+// --- app manifest (public self-config) ---
+
+export interface ProviderInfo {
+  id: string;
+  label: string;
+  description: string;
+  params: { name: string; type: string; required: boolean; description: string }[];
+}
+
+export interface AppManifest {
+  version: string;
+  freeBuildLimit: number;
+  priceUsd: number;
+  providers: ProviderInfo[];
+  features: { billing: boolean; email: boolean };
+}
+
+/** Public app config — version, free allowance, price, live-data catalog, and
+ *  which optional features are wired. No auth; safe to call before sign-in. */
+export async function getManifest(): Promise<AppManifest | null> {
+  try {
+    const res = await fetch("/v1/manifest");
+    if (!res.ok) return null;
+    return (await res.json()) as AppManifest;
+  } catch {
+    return null;
+  }
+}
+
 // --- data providers (server-proxied egress) ---
 
 /** Call a server-proxied data provider on behalf of a running tool. The runtime
