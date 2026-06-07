@@ -6,8 +6,10 @@ first-try success, overall success, latency, and a per-category breakdown.
 
 Every real production failure should become a permanent case here.
 
-**Progress toward the v1.0 target:** 27 / ≥200 prompts in the corpus (Doc 06
-§6.2). The corpus-growth plan and the eval-gate tightening are in
+**Progress toward the v1.0 target:** 52 / ≥200 prompts in the corpus (Doc 06
+§6.2), spanning calculator, timer, generator, tracker, notes, list, utility,
+converter, and live-`data` categories — including multi-feature, stateful, and
+edge-case prompts that exercise the repair loop, not just happy paths. The corpus-growth plan and the eval-gate tightening are in
 [`ROADMAP.md`](../ROADMAP.md). The live eval headline and the latest report
 are in [`STATUS.md`](../STATUS.md).
 

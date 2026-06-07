@@ -41,9 +41,9 @@ These are the items blocking the v1.1 public web launch. Order is approximate; t
 
 ### Growing the eval corpus (Doc 06 §6.2, RSK-02)
 
-- [ ] **Reach ≥85 prompts** in `eval/corpus.jsonl` (from 27). Mid-step before the 200-prompt v1.0 target; should exercise more difficulty bands and the disallowed subset.
+- [ ] **Reach ≥85 prompts** in `eval/corpus.jsonl` (from 52). Mid-step before the 200-prompt v1.0 target; should exercise more difficulty bands and the disallowed subset.
 - [ ] **Add a "hard" difficulty band** for the prompts Tier-1 is expected to fail on. → REQ-GEN-005
-- [ ] **Add the disallowed-prompt subset** for the 100% refusal gate (REQ-GEN-007) → CMP-12
+- [x] **Add the disallowed-prompt subset** for the 100% refusal gate (REQ-GEN-007) → CMP-12 — `eval/disallowed.jsonl` (12 cases across 7 harm categories) + a conservative server-side pre-filter (`server/src/safety.ts`) that refuses before any token spend; `server/test/safety.test.ts` asserts zero false positives on the full legit corpus and 100% catch on the subset. *Still to do: a model-based moderation pass for paraphrased/novel harmful intent, and an output-side check (full CMP-12).*
 - [ ] **Add a prompt-injection subset** for the 0% capability-escalation gate (REQ-SEC-005) → CMP-12
 - [ ] **Raise the default `EVAL_MIN_PASS_RATE` to 0.85** once the corpus is big enough to make the gate meaningful. → REQ-GEN-001
 - [ ] **Add a "first-try p50 / p90 latency" tracked metric** to the runner output (currently logged but not surfaced) → REQ-GEN-004
