@@ -22,10 +22,12 @@ import { ToolRunner } from "./components/ToolRunner";
 import { SourceView } from "./components/SourceView";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
+import { AdminDashboard } from "./components/AdminDashboard";
 
 type View =
   | { name: "home" }
   | { name: "build" }
+  | { name: "admin" }
   | { name: "run"; tool: SavedTool; tab: "run" | "source" };
 
 export default function App() {
@@ -155,6 +157,14 @@ export default function App() {
           🃏 Wild Card
         </button>
         <div className="account">
+          {user.isAdmin && (
+            <button
+              className={`admin-link${view.name === "admin" ? " active" : ""}`}
+              onClick={() => setView({ name: "admin" })}
+            >
+              Dashboard
+            </button>
+          )}
           <button
             className={`quota-badge${q.plan === "free" && q.remaining === 0 ? " quota-empty" : ""}`}
             onClick={() => q.plan === "free" && setShowPaywall(true)}
@@ -169,7 +179,11 @@ export default function App() {
       </header>
 
       <main className="content">
-        {view.name !== "run" && <PromptBar busy={busy} onSubmit={build} />}
+        {(view.name === "home" || view.name === "build") && (
+          <PromptBar busy={busy} onSubmit={build} />
+        )}
+
+        {view.name === "admin" && <AdminDashboard />}
 
         {view.name === "home" && (
           <HomeGrid

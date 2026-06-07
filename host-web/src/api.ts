@@ -24,6 +24,31 @@ export interface AuthUser {
   id: string;
   email: string;
   quota: Quota;
+  isAdmin?: boolean;
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  plan: "free" | "pro";
+  buildsUsed: number;
+  createdAt: number;
+  subscribed: boolean;
+}
+
+export interface AdminOverview {
+  generatedAt: number;
+  stats: {
+    totalUsers: number;
+    freeUsers: number;
+    proUsers: number;
+    subscribedUsers: number;
+    totalBuilds: number;
+    signupsLast7d: number;
+    estimatedMrrUsd: number;
+  };
+  priceUsd: number;
+  users: AdminUserRow[];
 }
 
 export type GenResult =
@@ -96,6 +121,38 @@ export async function logout(): Promise<void> {
     () => {}
   );
   clearSession();
+}
+
+// --- admin ---
+
+/** Owner-only roster + revenue roll-up. Throws on 403 (not an admin) or error. */
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const res = await fetch("/v1/admin/overview", { headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error ?? `Failed to load admin overview (${res.status})`);
+  }
+  return res.json();
+}
+
+// --- data providers (server-proxied egress) ---
+
+/** Call a server-proxied data provider on behalf of a running tool. The runtime
+ *  has already checked the provider is declared in the tool's manifest; the
+ *  server re-checks it against the fixed catalog and makes the upstream call.
+ *  Returns the provider's data, or throws with the server's error message. */
+export async function callProvider(
+  provider: string,
+  params: Record<string, unknown>
+): Promise<unknown> {
+  const res = await fetch(`/v1/net/${encodeURIComponent(provider)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ params }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? `provider "${provider}" failed (${res.status})`);
+  return j.data;
 }
 
 // --- billing ---

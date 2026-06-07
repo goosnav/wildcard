@@ -65,10 +65,14 @@ wildcard/
 │   ├── src/        contract.ts (strict output → bundle), generate.ts (orchestrator
 │   │               + bounded repair loop), validate.ts (headless-Chromium gate),
 │   │               openrouter-/anthropic-model.ts (model gateways, 429 retry),
-│   │               store.ts (JSON-file persistence), auth.ts (magic-link),
-│   │               quota.ts (free-build limit), stripe.ts + billing.ts (checkout
-│   │               + signed webhook), email.ts (Resend/dev link), server.ts (Hono)
+│   │               store.ts (persistence facade), auth.ts (magic-link),
+│   │               quota.ts (free-build limit), admin.ts (allow-listed dashboard),
+│   │               stripe.ts + billing.ts (checkout + signed webhook),
+│   │               email.ts (Resend/dev link), server.ts (Hono)
+│   │   store/      Backends behind store.ts: json-backend.ts (default, file) and
+│   │               pg-backend.ts (Postgres when DATABASE_URL is set); types.ts.
 │   ├── prompts/    system.md — the generation system prompt.
+│   ├── scripts/    store:smoke (validate the active store backend), dryrun, livegen.
 │   └── test/       Quota + repair-loop/contract tests (no API key needed).
 │
 ├── host-web/       React + Vite PWA shell: sign-in, home grid, prompt bar, build
@@ -134,18 +138,47 @@ curl -N -X POST http://localhost:8787/v1/generate \
   -d '{"prompt":"a tip splitter that remembers my usual tip %"}'
 ```
 
+### Persistence (store backend)
+
+Accounts, sessions, and entitlements go through one facade (`server/src/store.ts`)
+with two interchangeable backends:
+
+- **JSON file** (default) — `server/.data/db.json`, written atomically. Zero setup;
+  good for dev and small deployments.
+- **Postgres** — active when `DATABASE_URL` is set (Neon, Supabase, RDS, …). The
+  schema is created automatically on first connect; hosted Postgres uses TLS by
+  default. Switching backends needs no code change.
+
+Validate whichever backend is configured (the same lifecycle runs against both):
+
+```bash
+npm --workspace @wildcard/server run store:smoke                     # JSON (default)
+DATABASE_URL=postgres://… npm --workspace @wildcard/server run store:smoke   # your real DB
+```
+
 ### Quality eval
 
 `npm run eval` generates every prompt in `eval/corpus.jsonl` through the **same**
 orchestrator + validator the server uses, then scores first-try and overall pass
 rate, latency, and a per-category breakdown, writing a report to `eval/reports/`.
-It exits non-zero below `EVAL_MIN_PASS_RATE` so it can gate CI. To test without
-spending, point it at a free OpenRouter model (slug ending in `:free`):
+It exits non-zero below `EVAL_MIN_PASS_RATE` so it can gate CI. The current
+corpus is 27 prompts; the v1.0 target per Doc 06 §6.2 is ≥200. The default
+gate is `0.7`; raise it to `0.85` (the v1.0 acceptance target) once the corpus
+is bigger:
+
+```bash
+EVAL_MIN_PASS_RATE=0.85 npm run eval
+```
+
+To test without spending, point it at a free OpenRouter model (slug ending in `:free`):
 
 ```bash
 WC_MODEL=openai/gpt-oss-120b:free npm run eval -- --concurrency 1   # free tiers rate-limit
 WC_PROVIDER=stub npm run eval                                       # offline plumbing check
 ```
+
+See [`STATUS.md`](STATUS.md) for the live eval headline and the corpus-growth
+plan in [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -191,13 +224,36 @@ preserve.
 
 ## Status
 
-**Lean web slice — functionally complete.** The spine runs end-to-end: runtime
-isolation, Tier-1 generation with a validator-gated repair loop, a React PWA
-shell, local-first tool storage, magic-link accounts, a server-enforced free-build
-quota, and a Stripe paywall — with a regression eval harness gating quality. Live
+**Lean web slice — functionally complete and deployable.** The spine runs
+end-to-end: runtime isolation, Tier-1 generation with a validator-gated repair
+loop, a React PWA shell, local-first tool storage, magic-link accounts, a
+server-enforced free-build quota, a Stripe paywall, and an allow-listed admin
+dashboard — with a regression eval harness gating quality. Persistence runs on a
+local JSON file or Postgres (`DATABASE_URL`); magic links deliver via Resend; and
+a single-container `server/Dockerfile` serves both the API and the web app. Live
 first-try success on the starter corpus is ~92% (above the 85% target).
 
+**The headline is moving to [`STATUS.md`](STATUS.md).** It carries the live
+phase status, the full REQ → CMP → test traceability matrix, the API surface
+vs. the v1.0 contract, the eval headline, and the open-question tracker.
+
+**To ship it, see [`DEPLOY.md`](DEPLOY.md)** — services to connect (AI provider,
+Postgres, Resend, Stripe), the Docker build, and a post-deploy checklist.
+
 Still ahead: server-proxied data providers, prompt-cache cost tuning, a larger
-eval corpus, and the eventual React Native wrap for iOS/Android. See the build
-plan and the `dev/` bible for the full roadmap. Working title "Wild Card" pending
-a trademark/name check (OQ-01).
+eval corpus, the React Native wrap for iOS/Android, and the compliance items
+that gate a store submission. See the build plan and the `dev/` bible for the
+full roadmap. Working title "Wild Card" pending a trademark/name check (OQ-01).
+
+## Program docs
+
+| Doc | Purpose |
+|---|---|
+| [`STATUS.md`](STATUS.md) | Live state: phase table, REQ → CMP → test matrix, API surface, eval headline, OQ status. **Read first.** |
+| [`ROADMAP.md`](ROADMAP.md) | Phased checklist. The "v1.1 next-up" list at the top is the concrete work to ship the v1.1 web launch. |
+| [`SPRINTS.md`](SPRINTS.md) | 2-week iteration log. Sprint 1 is backfilled from git log; future sprints start blank. |
+| [`COMPLIANCE.md`](COMPLIANCE.md) | The Doc 07 §7.6 checklist, tracked. A v1.1-only "pre-launch web gate" subset at the bottom. |
+| [`DEPLOY.md`](DEPLOY.md) | Solo-deploy guide. |
+| [`AGENTS.md`](AGENTS.md) | Invariants + architecture map + commands for any contributor (human or AI). |
+| [`dev/00..09`](dev/) | The product specification ("app bible"), baselined v1.0. |
+| [`dev/10_WEB_SLICE_BASELINE_v1.1.txt`](dev/10_WEB_SLICE_BASELINE_v1.1.txt) | The v1.1 overlay — reconciles the v1.0 bible with the web slice actually being shipped. |

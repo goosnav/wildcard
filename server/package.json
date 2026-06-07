@@ -9,16 +9,19 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "dryrun": "tsx scripts/dryrun.ts",
-    "livegen": "tsx scripts/livegen.ts"
+    "livegen": "tsx scripts/livegen.ts",
+    "store:smoke": "tsx scripts/store-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
     "@hono/node-server": "^1.13.0",
     "@playwright/test": "^1.48.0",
     "@wildcard/runtime": "*",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

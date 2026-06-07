@@ -1,8 +1,20 @@
 # AGENTS.md
 
 Guidance for AI agents and human contributors working in this repository. Read
-this before making changes. The product spec lives in [`dev/`](dev/) (Docs 00–09);
-when this file and a spec doc disagree, the spec's requirement IDs win.
+this before making changes. The product spec lives in [`dev/`](dev/) (Docs 00–09
+plus the v1.1 overlay in Doc 10); when this file and a spec doc disagree, the
+spec's requirement IDs win.
+
+## Where we are
+
+The v1.1 web slice is built and deployable. Live state: **[STATUS.md](STATUS.md)**
+(phase table, REQ → CMP → test matrix, API surface, eval headline, OQ status).
+Next-up work: **[ROADMAP.md](ROADMAP.md)**. Iteration history: **[SPRINTS.md](SPRINTS.md)**.
+Store-readiness: **[COMPLIANCE.md](COMPLIANCE.md)**. The v1.1 vs v1.0 framing:
+**[dev/10_WEB_SLICE_BASELINE_v1.1.txt](dev/10_WEB_SLICE_BASELINE_v1.1.txt)**.
+
+If you are new here, read in this order: `STATUS.md` → `ROADMAP.md` → the
+relevant section of the bible (`dev/`) → the code.
 
 ---
 
@@ -68,20 +80,50 @@ runtime/  — built ONCE, runs in the browser today and the iOS WebView later.
                      routes WC requests to adapters. composeSrcdoc() injects SDK+CSP.
   memory-storage.ts  StorageAdapter impls (scoped = the isolation proof).
   types.ts           Bundle, Manifest, adapter interfaces.
+  test/              Playwright harness proving isolation, persistence, egress.
 
-server/   — generation backend.
+server/   — generation backend (CMP-03/04/05 + auth, quota, billing, admin).
   contract.ts        parseBundle(): strict <wc-app> model output → Bundle. Determinism.
   validate.ts        CMP-05: load a candidate in headless Chromium under the SAME
                      runtime, smoke-check. Reuses runtime/dist/runtime.global.js.
   generate.ts        CMP-03: orchestrator + bounded, validator-gated repair loop.
                      Model is an injectable interface (testable with no API key).
   anthropic-model.ts CMP-04: real Model, with prompt caching on the static prefix.
-  server.ts          /v1/generate SSE endpoint.
-  prompts/system.md  the generation system prompt + output contract.
+  openrouter-model.ts CMP-04: OpenRouter gateway (with 429 retry).
+  stub-model.ts      deterministic offline Model for tests and CI plumbing.
+  provider.ts        Model-factory + active-provider reporting.
+  providers.ts       Server-proxied data providers (CMP-07s) — fixed catalog
+                     (weather, currency) behind WC.net.fetch.
+  store.ts           Persistence facade (CMP-09/10/11 partial).
+  store/json-backend.ts  Default file-backed store (atomic JSON writes).
+  store/pg-backend.ts    Postgres backend (auto-schema; TLS).
+  auth.ts / email.ts     Magic-link auth (CMP-10).
+  quota.ts               Server-enforced free-build quota (CMP-09).
+  stripe.ts / billing.ts Stripe Checkout + signed webhook.
+  admin.ts               Allow-listed admin dashboard (CMP-13).
+  server.ts              Hono app; /v1/* routes; serves the built web app.
+  prompts/system.md      The generation system prompt + output contract.
+  scripts/               dryrun, livegen, store-smoke.
+  test/                  Vitest: quota, repair loop, contract, providers, openrouter 429.
+
+host-web/ — React + Vite PWA shell (CMP-01). Sign-in, prompt bar, build view,
+           sandboxed tool runner, home grid, source view, paywall, admin.
+  src/api.ts             Server client.
+  src/idb.ts             Local-first tool store (IndexedDB).
+  src/components/        BuildView, ToolRunner, HomeGrid, SourceView, Paywall,
+                         PromptBar, SignIn, AdminDashboard.
+
+eval/    — Regression eval (RSK-02 / Doc 06 §6.2).
+  corpus.jsonl          27 starter prompts; target ≥200 (see ROADMAP.md).
+  run.ts                Generates each case, scores, writes JSON report, gates CI.
+
+dev/     — The product specification ("app bible"), Docs 00-09 v1.0 + the
+           v1.1 web-slice overlay in Doc 10.
 ```
 
 **Data flow:** prompt → model → `parseBundle` → `validate` → (repair ≤3×) →
-deliver bundle → `mountTool` on device.
+deliver bundle → `mountTool` in the browser sandbox (same `runtime.global.js`
+the validator loads).
 
 ---
 
@@ -96,6 +138,13 @@ deliver bundle → `mountTool` on device.
 | Server tests (Vitest) | `npm --workspace @wildcard/server test` |
 | Typecheck server | `npm --workspace @wildcard/server run typecheck` |
 | Run server | `npm --workspace @wildcard/server run dev` |
+| Run web app | `npm --workspace @wildcard/host-web run dev` |
+| Run eval (live, costs $) | `npm run eval` |
+| Run eval (offline plumbing) | `WC_PROVIDER=stub npm run eval` |
+| Run eval with a tighter gate | `EVAL_MIN_PASS_RATE=0.85 npm run eval` |
+| Smoke-test the active store backend | `npm --workspace @wildcard/server run store:smoke` |
+| Exercise the full pipeline offline | `npm --workspace @wildcard/server run dryrun` |
+| Live generation smoke-test | `npm --workspace @wildcard/server run livegen -- "a tip splitter"` |
 
 `validate.ts` loads `runtime/dist/runtime.global.js`, so **rebuild the runtime
 bundle after changing `runtime/src/`** or the validator/tests will run stale code.

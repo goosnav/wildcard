@@ -22,3 +22,6 @@
 {"id": "todo-list", "category": "list", "prompt": "a simple todo list that persists my tasks"}
 {"id": "packing-list", "category": "list", "prompt": "a packing checklist for a trip"}
 {"id": "color-hex", "category": "utility", "prompt": "pick a color and show me its hex code to copy"}
+{"id": "weather-now", "category": "data", "prompt": "show me the current temperature and conditions for a latitude and longitude I enter"}
+{"id": "currency-convert", "category": "data", "prompt": "convert an amount from one currency to another using live exchange rates"}
+{"id": "travel-weather", "category": "data", "prompt": "tell me the weather right now for my saved home coordinates so I know how to dress"}

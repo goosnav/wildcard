@@ -1,171 +1,93 @@
-// Tiny zero-dependency persistence for the v1 lean slice. The whole state lives
-// in one JSON file written atomically (temp + rename) on every mutation. Volume
-// is low (early users), so simplicity beats a database here. Everything goes
-// through this module's small interface, so swapping in Postgres later is a
-// contained change — no caller touches the file directly.
-//
+// Persistence facade. Selects a backend once (Postgres if DATABASE_URL is set,
+// else the zero-dependency JSON file) and exposes a small async API over it.
 // Source of truth for entitlements + quota (REQ-PAY-003, REQ-NFR-006): the
 // server owns buildsUsed and plan; the client can never grant itself builds.
+// No caller touches a backend directly, so adding/swapping backends stays here.
 
 import { randomBytes } from "node:crypto";
-import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { type Backend } from "./store/types.js";
+import { createJsonBackend } from "./store/json-backend.js";
+import { createPgBackend } from "./store/pg-backend.js";
 
-export type Plan = "free" | "pro";
+export type { Plan, User, MagicToken, Session } from "./store/types.js";
 
-export interface User {
-  id: string;
-  email: string;
-  plan: Plan;
-  buildsUsed: number;
-  createdAt: number;
-  stripeCustomerId?: string;
-  stripeSubscriptionId?: string;
-}
+// Initialize the backend once. Postgres needs an async schema bootstrap, so the
+// whole thing is memoized behind a promise; every call awaits the same init.
+let backendPromise: Promise<Backend> | null = null;
 
-export interface MagicToken {
-  token: string;
-  email: string;
-  expiresAt: number;
-}
-
-export interface Session {
-  token: string;
-  userId: string;
-  createdAt: number;
-}
-
-interface DbShape {
-  users: User[];
-  magicTokens: MagicToken[];
-  sessions: Session[];
-}
-
-const here = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(here, "../.data");
-const DB_PATH = resolve(DATA_DIR, "db.json");
-
-function emptyDb(): DbShape {
-  return { users: [], magicTokens: [], sessions: [] };
-}
-
-function load(): DbShape {
-  try {
-    const parsed = JSON.parse(readFileSync(DB_PATH, "utf8")) as Partial<DbShape>;
-    return {
-      users: parsed.users ?? [],
-      magicTokens: parsed.magicTokens ?? [],
-      sessions: parsed.sessions ?? [],
-    };
-  } catch {
-    return emptyDb();
+function backend(): Promise<Backend> {
+  if (!backendPromise) {
+    const url = process.env.DATABASE_URL?.trim();
+    backendPromise = url ? createPgBackend(url) : Promise.resolve(createJsonBackend());
   }
+  return backendPromise;
 }
 
-let db = load();
-
-function persist(): void {
-  mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = `${DB_PATH}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(db, null, 2));
-  renameSync(tmp, DB_PATH); // atomic on the same filesystem
+/** Which backend is active ("json" | "postgres"), for /health + startup logs.
+ *  Triggers initialization if it hasn't happened yet. */
+export async function backendName(): Promise<string> {
+  return (await backend()).name;
 }
 
-function id(prefix: string): string {
-  return `${prefix}_${randomBytes(9).toString("hex")}`;
-}
-
+/** Random opaque token (magic links + sessions). */
 export function token(): string {
   return randomBytes(24).toString("hex");
 }
 
-const now = () => Date.now();
-
 // --- users ---
 
-export function findUserByEmail(email: string): User | undefined {
-  const e = email.toLowerCase();
-  return db.users.find((u) => u.email === e);
+export async function findUserByEmail(email: string) {
+  return (await backend()).findUserByEmail(email);
 }
 
-export function findUserById(userId: string): User | undefined {
-  return db.users.find((u) => u.id === userId);
+export async function findUserById(userId: string) {
+  return (await backend()).findUserById(userId);
 }
 
-export function createUser(email: string): User {
-  const user: User = {
-    id: id("usr"),
-    email: email.toLowerCase(),
-    plan: "free",
-    buildsUsed: 0,
-    createdAt: now(),
-  };
-  db.users.push(user);
-  persist();
-  return user;
+export async function findUserByStripeCustomer(customerId: string) {
+  return (await backend()).findUserByStripeCustomer(customerId);
 }
 
-export function upsertUser(email: string): User {
-  return findUserByEmail(email) ?? createUser(email);
+export async function createUser(email: string) {
+  return (await backend()).createUser(email);
+}
+
+/** Find by email or create — the sign-in upsert. */
+export async function upsertUser(email: string) {
+  const b = await backend();
+  return (await b.findUserByEmail(email)) ?? (await b.createUser(email));
 }
 
 /** Apply a patch to a stored user and persist. Returns the updated user. */
-export function updateUser(userId: string, patch: Partial<User>): User {
-  const user = findUserById(userId);
-  if (!user) throw new Error(`user not found: ${userId}`);
-  Object.assign(user, patch);
-  persist();
-  return user;
+export async function updateUser(userId: string, patch: Partial<import("./store/types.js").User>) {
+  return (await backend()).updateUser(userId, patch);
 }
 
-export function findUserByStripeCustomer(customerId: string): User | undefined {
-  return db.users.find((u) => u.stripeCustomerId === customerId);
+/** All users, newest first. For the admin dashboard. */
+export async function listUsers() {
+  return (await backend()).listUsers();
 }
 
 // --- magic-link tokens (single-use) ---
 
-const MAGIC_TTL_MS = 15 * 60 * 1000;
-
-export function createMagicToken(email: string): MagicToken {
-  const mt: MagicToken = {
-    token: token(),
-    email: email.toLowerCase(),
-    expiresAt: now() + MAGIC_TTL_MS,
-  };
-  db.magicTokens.push(mt);
-  persist();
-  return mt;
+export async function createMagicToken(email: string) {
+  return (await backend()).createMagicToken(email);
 }
 
-/** Consume a magic token: returns its email if valid, else null. Single-use —
- *  the token (and any expired ones) are removed regardless. */
-export function consumeMagicToken(tok: string): string | null {
-  const mt = db.magicTokens.find((m) => m.token === tok);
-  db.magicTokens = db.magicTokens.filter(
-    (m) => m.token !== tok && m.expiresAt > now()
-  );
-  persist();
-  if (!mt || mt.expiresAt <= now()) return null;
-  return mt.email;
+export async function consumeMagicToken(tok: string) {
+  return (await backend()).consumeMagicToken(tok);
 }
 
 // --- sessions ---
 
-export function createSession(userId: string): Session {
-  const s: Session = { token: token(), userId, createdAt: now() };
-  db.sessions.push(s);
-  persist();
-  return s;
+export async function createSession(userId: string) {
+  return (await backend()).createSession(userId);
 }
 
-export function userForSession(tok: string): User | undefined {
-  const s = db.sessions.find((x) => x.token === tok);
-  return s ? findUserById(s.userId) : undefined;
+export async function userForSession(tok: string) {
+  return (await backend()).userForSession(tok);
 }
 
-export function deleteSession(tok: string): void {
-  const before = db.sessions.length;
-  db.sessions = db.sessions.filter((x) => x.token !== tok);
-  if (db.sessions.length !== before) persist();
+export async function deleteSession(tok: string) {
+  return (await backend()).deleteSession(tok);
 }

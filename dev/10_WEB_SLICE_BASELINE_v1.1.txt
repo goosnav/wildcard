@@ -1,0 +1,391 @@
+================================================================================
+  W I L D   C A R D   —   A P P   B I B L E
+  Document 10 · WEB-SLICE BASELINE v1.1 (an overlay on the v1.0 bible)
+================================================================================
+
+  Status: BASELINE v1.1 — issued alongside Docs 00-09 v1.0.
+
+  This document RECONCILES the v1.0 bible (Docs 00-09) with the lean web slice
+  the program is actually shipping first (the "LEAN REVENUE-FIRST SLICE" in
+  Doc 05 §5.6). It does NOT replace the v1.0 bible: v1.0 is the long-term GA
+  target. v1.1 is the smaller, web-channel-only build that funds the rest by
+  reaching paying users first.
+
+  Per Doc 00 §0.6, the v1.0 bible is the source of truth. This overlay is the
+  single place that re-frames each v1.0 claim as "in v1.1", "partial in v1.1",
+  "deferred to v1.0+", or "out of scope". When the two disagree, v1.0 wins on
+  intent; v1.1 wins on what is actually shipping in the next release.
+
+  Live program state lives in STATUS.md. Next-up work lives in ROADMAP.md.
+  Iteration history lives in SPRINTS.md. Store-readiness lives in COMPLIANCE.md.
+
+  Last updated: 2026-06-07.
+
+--------------------------------------------------------------------------------
+10.1  WHY THIS OVERLAY EXISTS
+--------------------------------------------------------------------------------
+
+  The v1.0 bible (baselined 2026-06-03) was written for the full General
+  Availability program: iOS + Android, Tier-1 and Tier-2 generation, RN shell,
+  cross-device encrypted sync, and a 5-6 FTE team working 7-9 months (Doc 05).
+
+  Since 2026-06-06 the repository has been building the LEAN REVENUE-FIRST
+  SLICE the bible itself recommends in §5.6: a single web/PWA channel, Tier-1
+  generation only, no second platform, no sync. That slice is the v1.1
+  release; the rest of the v1.0 program is the v1.0+ roadmap. This overlay
+  exists so:
+
+    - A new contributor can read STATUS.md + this doc + the relevant bible
+      section and not be confused by docs that describe a product larger than
+      what is shipping.
+    - A reviewer can verify that v1.1 is consistent with the bible's intent
+      (tenets, security model, store posture) even where the scope is smaller.
+    - When v1.0+ work begins (iOS, Android, Tier-2, sync) it is unambiguous
+      which bible sections come back into scope.
+
+  The v1.0 IDs (REQ-*, CMP-*, TC-*, M*, RSK-*, OQ-*) are STABLE and reused
+  unchanged in v1.1. We annotate status; we do not renumber.
+
+--------------------------------------------------------------------------------
+10.2  v1.0 vs v1.1 — SIDE-BY-SIDE SCOPE
+--------------------------------------------------------------------------------
+
+  v1.0 (the long-term GA target — Doc 05 §5.4, Doc 01 §7)
+    - iOS app (React Native + thin native modules for WebKit/StoreKit).
+    - Android app (React Native + Android-native bridge for richer capabilities).
+    - Tier-1 generation (single model call + bounded repair loop).
+    - Tier-2 agentic builds (Claude Agent SDK in an ephemeral cloud sandbox).
+    - Live build preview, AI editing with version history, source view/edit.
+    - Home grid with folders, drag, long-press actions, search.
+    - Local-first storage with optional encrypted cross-device sync.
+    - IAP via StoreKit (iOS) and Play Billing (Android), with RevenueCat.
+    - Content manifest + privacy disclosures + Apple Privacy Label + Play
+      Data Safety form.
+    - Eval harness >=200 prompts gating prompt/model changes in CI.
+    - External pentest, accessibility audit, store submission and review.
+
+  v1.1 (the web slice being shipped first — this doc, Doc 05 §5.6)
+    - Web/PWA app (React + Vite shell, single container serves API + UI).
+    - Tier-1 generation only (no Tier-2 agentic builds).
+    - Live build preview via SSE, "Keep it" / "Discard" flow, home grid.
+    - Source view in READ-ONLY mode (edit deferred; see ROADMAP.md).
+    - Magic-link email auth, server-enforced free-build quota, Stripe checkout
+      for Pro subscriptions via web (not IAP — IAP is a v1.0+ concern).
+    - JSON or Postgres storage; Resend magic links; Docker-deployable.
+    - Server-proxied data providers (weather, currency) behind a fixed catalog
+      and an allow-list (REQ-RUN-005).
+    - Eval harness with the 27-prompt starter corpus (target gate: >=85%
+      first-try, >=200 prompts at v1.0).
+    - Posture and store-readiness for a WEB launch only. iOS / Android builds
+      are deferred. The same Runtime SDK and bundle format ship in v1.1 and
+      are wrapped unchanged in v1.0 (Doc 03 §3.1; Doc 07 §7.5).
+
+  Items DELIBERATELY not in v1.0 either (per Doc 01 §7): multi-user sharing,
+  a public gallery/marketplace, team/collaboration features, web embedding of
+  others' tools, plug-in ecosystems. These are post-GA bets.
+
+--------------------------------------------------------------------------------
+10.3  v1.1 ARCHITECTURE (re-states Doc 03 in v1.1 terms)
+--------------------------------------------------------------------------------
+
+  v1.1 IS the architecture described in Doc 03 §3.1-3.8, restricted to the
+  web channel. The on-device runtime (Doc 03 §3.2) is the browser, not a
+  native WebView. Everything else is identical.
+
+  - GENERATION (CMP-03 + CMP-04 + CMP-05): server-side. Tier-1 only. The
+    Model Gateway prefers OpenRouter (with 429 retry), falls back to Anthropic,
+    and supports a deterministic stub for offline plumbing checks.
+  - EXECUTION (CMP-02 + CMP-07s): browser-side, in an `<iframe sandbox>`
+    with a strict CSP (no `allow-same-origin`). The injected `WC` global is
+    built ONCE from `runtime/src/sdk.ts` and is the SAME artifact the
+    server-side validator loads (CMP-05 parity; Doc 03 §3.8; AGENTS.md).
+  - PERSISTENCE (CMP-09 / CMP-10 / CMP-11 partial): local-first in the
+    browser (IndexedDB via `host-web/src/idb.ts`) + server (Postgres or JSON
+    file via `server/src/store.ts`). Cross-device sync is v1.0+ (REQ-DATA-002).
+  - BILLING (CMP-09 partial): Stripe Checkout for web subscriptions
+    (`server/src/stripe.ts` + `server/src/billing.ts`). Entitlements enforced
+    server-side (REQ-PAY-003, REQ-NFR-006).
+  - MODERATION (CMP-12): NOT YET IMPLEMENTED in v1.1 (see STATUS.md matrix;
+    v1.1 ships a Trust-and-Safety surface later — web launch tolerates a
+    pre-screen/post-screen gap because there is no App Review gating it).
+  - OBSERVABILITY (CMP-13 partial): `/health` reports subsystem state; an
+    allow-listed admin dashboard exposes a roll-up view. Per-user rate
+    limits, cost dashboards, and full observability are v1.0+.
+
+  Two trust boundaries the v1.1 spec inherits UNCHANGED from Doc 03 §3.8:
+    1. The host app <-> generated app boundary is UNTRUSTED. Tools are
+       adversarial. The Runtime SDK surface is fixed at host build time.
+    2. The client <-> LLM provider boundary is INDIRECT. The provider API
+       key is server-side only (REQ-SEC-001). The browser authenticates to
+       our backend; our backend authenticates to the provider.
+
+--------------------------------------------------------------------------------
+10.4  REQUIREMENT RECONCILIATION (Doc 02 in v1.1)
+--------------------------------------------------------------------------------
+
+  Status legend used below (see STATUS.md for the per-requirement row with
+  the file/test that backs each "shipped" or "partial" status):
+
+    shipped      Working in the v1.1 codebase with a test or demonstrable flow.
+    partial      Partly working; the missing pieces are tracked in ROADMAP.md.
+    deferred     In v1.0 but not in v1.1. The v1.0 bible claim still stands.
+    out-of-scope Not part of v1.0 either (per Doc 01 §7).
+    n/a-web      v1.0 requirement that does not apply to a web-only launch.
+
+  REQ-GEN-*  Generation
+    001 [M] >=85% first-try ............... shipped (eval harness; 27/27
+                                              stub pass; ~92% live).
+    002 [M] validator-gated delivery ....... shipped (CMP-05; 0/0 broken tools
+                                              delivered; the validator is
+                                              the only pass/fail source).
+    003 [M] live preview + Keep/Discard .... shipped (SSE build view; ToolRunner
+                                              mounts the bundle on Keep).
+    004 [M] Tier-1 fast path + repair loop . shipped (default N=3 repair turns).
+    005 [S] Tier-2 agentic ................ deferred (CMP-06; Doc 04 §4.4).
+    006 [M] edit-with-AI + versions + revert partial (build flow exists; version
+                                              history and revert not wired).
+    007 [M] refuse disallowed with alt .... partial (no input/output safety
+                                              screen yet — see CMP-12 in
+                                              ROADMAP.md).
+    008 [M] honest "reduced scope" on fail . shipped (repair loop's terminal
+                                              branch; the validator returns a
+                                              typed reason).
+    009 [S] cheapest-model routing ......... partial (provider selection exists;
+                                              no classifier-based routing yet).
+    010 [M] validator parity w/ device ..... shipped (CMP-05 loads the SAME
+                                              runtime.global.js the device
+                                              runs; AGENTS.md invariant).
+    011 [S] user code import .............. partial (no /v1/import endpoint
+                                              yet; ROADMAP.md).
+
+  REQ-RUN-*  Runtime / execution
+    001 [M] previously-made tools offline .. shipped (browser-served, no
+                                              server round-trip).
+    002 [M] cross-app isolation ............ shipped (per-iframe null origin;
+                                              Playwright-tested).
+    003 [M] scoped persistent KV ........... shipped (WC.storage).
+    004 [M] export via host chrome ........ shipped (web share sheet from the
+                                              tool runner's chrome; the app's
+                                              own JS never calls a share API).
+    005 [M] network allow-list ............. shipped (CSP connect-src 'none';
+                                              WC.net.fetch routes through the
+                                              server-proxied catalog only).
+    006 [S] Android extended capabilities .. deferred (Android is v1.0+).
+    007 [M] app crash contained, host stable shipped (tool errors are caught by
+                                              the sandbox; "Fix with AI" path
+                                              is the build view).
+    008 [S] fast launch time ............... shipped (p50 ~1.2s on the stub
+                                              provider; live latency target
+                                              p50 <=20s, p90 <=45s per
+                                              REQ-GEN-004).
+
+  REQ-HOME-*  Home / library
+    001 [M] grid + persistent prompt ....... shipped.
+    002 [M] drag to reorder ............... partial (no drag UI yet;
+                                              ROADMAP.md).
+    003 [M] folders from drag .............. partial.
+    004 [M] long-press actions menu ....... partial.
+    005 [M] delete removes bundle + data .. shipped.
+    006 [S] auto-suggested name + icon .... shipped (name + emoji come from
+                                              the generator's <wc-app> attr;
+                                              user can rename in source view).
+    007 [C] search/filter ................. deferred (lowest priority; v1.0+).
+
+  REQ-EDIT-*  Code / source
+    001 [M] viewable source ............... shipped (SourceView component).
+    002 [M] edit + run + re-validate ....... partial (editor is read-only in
+                                              v1.1; ROADMAP.md).
+    003 [S] syntax highlighting + errors ... partial.
+    004 [M] edited code re-validated ....... deferred (depends on REQ-EDIT-002).
+
+  REQ-DATA-*  Data & sync
+    001 [M] local-first .................... shipped (IndexedDB on the device;
+                                              server is authoritative only for
+                                              account + entitlements).
+    002 [S] cross-device sync .............. deferred (CMP-11; v1.0+).
+    003 [M] encryption in transit + at rest  shipped (TLS in transit; Postgres
+                                              at-rest encryption; bundles are
+                                              content-addressed by hash).
+    004 [M] full library export + delete ... partial (delete via account
+                                              deletion; export is a manual
+                                              "copy the bundle" today; the
+                                              first-class export endpoint is
+                                              ROADMAP.md).
+    005 [S] LWW + conflict surfacing ...... deferred (depends on REQ-DATA-002).
+
+  REQ-ACCT-*  Accounts / auth
+    001 [M] account not in front of first
+            win .......................... shipped (auth-light first session;
+                                              sign-in is offered after Keep).
+    002 [M] Sign in with Apple + email .... partial (email magic link only in
+                                              v1.1; Sign in with Apple is
+                                              n/a-web).
+    003 [M] auth on privileged actions .... shipped (bearer token middleware;
+                                              /v1/me, /v1/generate, /v1/billing
+                                              all gated).
+    004 [M] account + data delete in-app .. partial (logout clears local
+                                              session; full account + data
+                                              delete ROADMAP.md).
+
+  REQ-PAY-*  Billing
+    001 [M] metered free Tier-1 quota ...... shipped (server-enforced
+                                              `quotaFor`; default 3/mo for
+                                              free users).
+    002 [M] IAP via platform .............. n/a-web (v1.1 sells via Stripe
+                                              Checkout on the web; StoreKit /
+                                              Play Billing is v1.0+).
+    003 [M] server-side entitlement truth . shipped (CMP-09).
+    004 [M] webhook updates entitlement ... shipped (signed Stripe webhook;
+                                              /v1/billing/webhook).
+    005 [S] visible quota/credits ......... shipped (Paywall component shows
+                                              remaining builds).
+
+  REQ-SEC-*  Security
+    001 [M] no provider key in client/bundle shipped (REQ-SEC-001 binding;
+                                              server env only).
+    002 [M] restrictive CSP + sandbox ..... shipped (iframe sandbox + strict
+                                              CSP; AGENTS.md invariant 5).
+    003 [M] rate limit + abuse detection .. partial (per-user quota exists;
+                                              anomaly detection and explicit
+                                              rate-limit middleware ROADMAP.md).
+    004 [M] encryption transit + at rest .. shipped.
+    005 [M] injection cannot escalate ..... partial (capability surface is
+                                              fixed; input/output screening
+                                              ROADMAP.md — see CMP-12).
+
+  REQ-PRIV-*  Privacy & compliance
+    001 [M] AI data-sharing consent ....... partial (consent copy is in the
+                                              prompt flow; explicit consent
+                                              screen ROADMAP.md).
+    002 [M] in-app report path ............ partial (/v1/reports not yet
+                                              exposed; moderation queue
+                                              ROADMAP.md — see CMP-12).
+    003 [M] privacy policy + disclosures .. partial (policy not yet written;
+                                              OQ-02 + COMPLIANCE.md).
+    004 [M] AI-transparency regimes ....... deferred until legal review (OQ-02).
+    005 [M] not directed to children ...... shipped (no child-directed content
+                                              surfaces; age gating in the
+                                              paywall is on the roadmap).
+
+  REQ-NFR-*  Non-functional
+    001 [M] graceful degradation .......... shipped (SSE has a hard timeout;
+                                              the user sees an honest message,
+                                              not a hang).
+    002 [M] accessibility basics .......... partial (semantic HTML in the host
+                                              shell; full audit deferred).
+    003 [S] observability dashboards ...... partial (/health + admin dashboard;
+                                              per-user cost dashboards
+                                              ROADMAP.md).
+    004 [M] scale generation horizontally . shipped (Hono + Node; single
+                                              container; Postgres when
+                                              DATABASE_URL is set).
+    005 [S] localization-ready ............ deferred (i18n framework choice
+                                              is v1.0+; v1.1 is English-only
+                                              and the strings are not yet
+                                              externalized).
+    006 [M] hard per-user cost ceiling .... partial (quota is a build cap;
+                                              cost in dollars is bounded
+                                              indirectly; a token-budget
+                                              middleware ROADMAP.md).
+
+  REQ-PLT-*  Platform
+    001 [M] iOS App Store compliance ...... deferred (iOS is v1.0+; COMPLIANCE.md
+                                              tracks the Doc 07 §7.6 items).
+    002 [M] Google Play compliance ........ deferred (Android is v1.0+;
+                                              COMPLIANCE.md).
+    003 [M] iOS/Android min versions ...... deferred (no native targets in
+                                              v1.1; Doc 03 §3.9 baseline
+                                              catalog defined).
+    004 [S] web/PWA channel ............... shipped (this v1.1).
+
+--------------------------------------------------------------------------------
+10.5  COMPONENT RECONCILIATION (Doc 03 in v1.1)
+--------------------------------------------------------------------------------
+
+  CMP-01  Mobile Host App .................. partial (web host shell; the
+                                               mobile/host-app parity layer
+                                               is deferred to v1.0+).
+  CMP-02  Runtime + Runtime SDK ............ shipped (runtime/src/*;
+                                               injected as WC global; v1.1
+                                               uses it in both the browser
+                                               sandbox and the validator).
+  CMP-03  Generation Orchestrator .......... shipped (server/src/generate.ts;
+                                               Tier-1 only).
+  CMP-04  Model Gateway .................... shipped (server/src/provider.ts
+                                               + openrouter-model.ts +
+                                               anthropic-model.ts + stub).
+  CMP-05  Validation/Eval Harness .......... shipped (server/src/validate.ts;
+                                               eval/ harness; reuses
+                                               runtime/dist/runtime.global.js
+                                               — see AGENTS.md invariant 9).
+  CMP-06  Agentic Build Service ............ deferred (Tier-2; v1.0+).
+  CMP-07  Egress Broker / Capability Client
+           (server + on-device halves) ..... shipped for the server half
+                                               (server/src/providers.ts) and
+                                               the web half (WC.net.fetch).
+  CMP-08  Host Chrome Export ............... shipped (web share sheet from
+                                               ToolRunner's chrome; the
+                                               tool's own JS does NOT call
+                                               any share API — AGENTS.md
+                                               invariant 2).
+  CMP-09  Entitlements & Billing ........... shipped (server/src/quota.ts,
+                                               stripe.ts, billing.ts).
+  CMP-10  Identity / Auth .................. shipped (magic-link only in
+                                               v1.1; Sign in with Apple /
+                                               Google are v1.0+).
+  CMP-11  Sync & Storage ................... partial (store.ts + store/
+                                               backends; cross-device sync
+                                               deferred to v1.0+).
+  CMP-12  Manifest & Moderation ............ partial (no /v1/manifest endpoint
+                                               yet; no moderation queue; both
+                                               ROADMAP.md).
+  CMP-13  Observability & Admin ............ partial (/health + admin
+                                               dashboard; per-user cost
+                                               dashboards + alerting
+                                               ROADMAP.md).
+
+--------------------------------------------------------------------------------
+10.6  WHAT v1.1 IS NOT (so a reviewer cannot accuse us of over-claiming)
+--------------------------------------------------------------------------------
+
+  - v1.1 is NOT iOS-compliant. We do not ship an iOS build. Doc 07 §7.6
+    items are tracked in COMPLIANCE.md; most are `deferred` or `n/a-web`.
+  - v1.1 is NOT Android-compliant for the same reason.
+  - v1.1 does NOT run Tier-2 agentic builds. Hard prompts that Tier-1
+    cannot deliver are surfaced honestly (REQ-GEN-008), not built at all
+    in v1.1.
+  - v1.1 does NOT sync across devices. A tool made on phone A lives on
+    phone A. An account is still useful for the server-side quota and
+    entitlements; cross-device library sync is v1.0+ (REQ-DATA-002).
+  - v1.1 does NOT have a marketplace, gallery, social layer, plug-in
+    system, or any "share the tool with another user" path. Per Doc 01
+    §7 these are out of scope at any version.
+  - v1.1 does NOT have a moderation queue or input/output safety screen.
+    The launch is a creator-facing, low-traffic web app; a pre-launch
+    human review of the prompt corpus is the v1.1 safety posture, and
+    CMP-12 is ROADMAP.md.
+  - v1.1 does NOT have a published Privacy Policy / Terms of Service.
+    This is the v1.1 launch blocker (OQ-02; COMPLIANCE.md).
+
+--------------------------------------------------------------------------------
+10.7  WHEN TO UPDATE THIS DOCUMENT
+--------------------------------------------------------------------------------
+
+  - When a v1.0 requirement changes status in v1.1 (a new shipped item,
+    a new partial, a deferred item that is now back in scope because the
+    v1.0 work has begun). Update §10.4 and §10.5.
+  - When v1.0+ work begins in earnest (i.e. when we open the iOS or
+    Android workstream). Add a v1.0+ section that re-asserts the
+    deferred rows, mark this overlay as historical.
+  - When the bible (Docs 00-09) re-baselines. The overlay's role is to
+    absorb the delta, not to fight the bible. Edit in place; do not
+    delete — historical overlays are useful for understanding why the
+    scope changed.
+  - For day-to-day status (which requirement is shipped this minute,
+    which eval passed this run, which OQ is blocked on what), edit
+    STATUS.md. This overlay is the static framing; STATUS.md is the
+    live state.
+
+================================================================================
+  END OF DOCUMENT 10
+================================================================================

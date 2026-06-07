@@ -3,6 +3,7 @@
 // the client renders whatever /v1/me returns but can never grant itself builds.
 
 import type { User, Plan } from "./store.js";
+import { isAdminEmail } from "./admin.js";
 
 export const FREE_BUILD_LIMIT = 3;
 
@@ -36,11 +37,14 @@ export function quotaFor(user: User): Quota {
   };
 }
 
-/** The client-safe shape of a user: identity + quota, no Stripe/internal ids. */
+/** The client-safe shape of a user: identity + quota, no Stripe/internal ids.
+ *  `isAdmin` lets the web app reveal the admin link; the server still re-checks
+ *  the allow-list on every admin request, so this flag is not a trust boundary. */
 export function publicUser(user: User) {
   return {
     id: user.id,
     email: user.email,
     quota: quotaFor(user),
+    isAdmin: isAdminEmail(user.email),
   };
 }

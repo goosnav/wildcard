@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { mountTool, type Bundle, type ToolOutput } from "@wildcard/runtime";
 import { idbStorageForTool } from "../idb";
+import { callProvider } from "../api";
 
 export function ToolRunner({ bundle }: { bundle: Bundle }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,6 +22,9 @@ export function ToolRunner({ bundle }: { bundle: Bundle }) {
     const mounted = mountTool(container, {
       bundle,
       storage: idbStorageForTool(bundle.manifest.id),
+      // Server-proxied egress: the runtime gates this on the tool's declared
+      // providers before it ever reaches the network (REQ-RUN-005).
+      net: { fetch: (provider, params) => callProvider(provider, params) },
       onOutput: setOutput,
       onError: setError,
     });

@@ -10,10 +10,10 @@ import {
 } from "./store.js";
 import type { StripeEvent } from "./stripe.js";
 
-function userFromObject(obj: any): User | undefined {
+async function userFromObject(obj: any): Promise<User | undefined> {
   const userId = obj?.metadata?.userId ?? obj?.client_reference_id;
   if (userId) {
-    const u = findUserById(userId);
+    const u = await findUserById(userId);
     if (u) return u;
   }
   const customer = typeof obj?.customer === "string" ? obj.customer : undefined;
@@ -22,14 +22,14 @@ function userFromObject(obj: any): User | undefined {
 
 const ACTIVE = new Set(["active", "trialing", "past_due"]);
 
-export function handleStripeEvent(event: StripeEvent): void {
+export async function handleStripeEvent(event: StripeEvent): Promise<void> {
   const obj = event.data.object;
-  const user = userFromObject(obj);
+  const user = await userFromObject(obj);
   if (!user) return; // unknown user — nothing to entitle
 
   switch (event.type) {
     case "checkout.session.completed": {
-      updateUser(user.id, {
+      await updateUser(user.id, {
         plan: "pro",
         stripeCustomerId:
           typeof obj.customer === "string" ? obj.customer : user.stripeCustomerId,
@@ -41,7 +41,7 @@ export function handleStripeEvent(event: StripeEvent): void {
       break;
     }
     case "customer.subscription.updated": {
-      updateUser(user.id, {
+      await updateUser(user.id, {
         plan: ACTIVE.has(obj.status) ? "pro" : "free",
         stripeSubscriptionId: obj.id ?? user.stripeSubscriptionId,
         stripeCustomerId:
@@ -50,7 +50,7 @@ export function handleStripeEvent(event: StripeEvent): void {
       break;
     }
     case "customer.subscription.deleted": {
-      updateUser(user.id, { plan: "free" });
+      await updateUser(user.id, { plan: "free" });
       break;
     }
   }

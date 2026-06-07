@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { Bundle } from "@wildcard/runtime";
+import { providerSamples } from "./providers.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_GLOBAL = resolve(here, "../../runtime/dist/runtime.global.js");
@@ -74,13 +75,19 @@ export async function validate(
     await page.addScriptTag({ content: runtimeSrc });
 
     const wcErrors: string[] = await page.evaluate(
-      async ({ bundle, settleMs }) => {
+      async ({ bundle, settleMs, samples }) => {
         const RT = (window as any).WildcardRuntime;
         const errs: string[] = [];
         let ready = false;
         const mounted = RT.mountTool(document.getElementById("stage"), {
           bundle,
           storage: RT.memoryStorage(),
+          // Stub egress with representative samples so live-data tools can be
+          // validated offline — we exercise the tool's code, not the upstream.
+          net: {
+            fetch: (provider: string) =>
+              Promise.resolve((samples as Record<string, unknown>)[provider] ?? {}),
+          },
           onError: (m: string) => errs.push(m),
         });
         // Detect the SDK 'ready' signal by racing a short wait.
@@ -90,7 +97,7 @@ export async function validate(
         if (!ready) errs.push("Tool frame failed to mount");
         return errs;
       },
-      { bundle: bundle as any, settleMs: opts.settleMs ?? 400 }
+      { bundle: bundle as any, settleMs: opts.settleMs ?? 400, samples: providerSamples() }
     );
 
     errors.push(...wcErrors, ...consoleErrors);
