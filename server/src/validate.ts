@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { Bundle } from "@wildcard/runtime";
-import { providerSamples } from "./providers.js";
+import { providerSamples, isProvider } from "./providers.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_GLOBAL = resolve(here, "../../runtime/dist/runtime.global.js");
@@ -70,6 +70,14 @@ export async function validate(
     errors.push("Remote <script src> is forbidden (must be self-contained)");
   if (/<link\s+[^>]*\bhref\s*=\s*["']https?:/i.test(html))
     errors.push("Remote <link href> is forbidden (must be self-contained)");
+  // A tool may only declare providers that actually exist in the catalog;
+  // otherwise it would ship and then fail the moment it calls WC.net.fetch.
+  const unknown = bundle.manifest.providers.filter((p) => !isProvider(p));
+  if (unknown.length)
+    errors.push(
+      `Declares unknown data provider(s): ${unknown.join(", ")}. ` +
+        `Use only the providers listed in the system prompt, or set providers="".`
+    );
   if (errors.length) return { pass: false, errors };
 
   // --- dynamic check: actually run it ---
