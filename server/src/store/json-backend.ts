@@ -18,8 +18,7 @@ import {
 } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(here, "../../.data");
-const DB_PATH = resolve(DATA_DIR, "db.json");
+const DEFAULT_DATA_DIR = resolve(here, "../../.data");
 
 const now = () => Date.now();
 
@@ -31,7 +30,10 @@ function tokenStr(): string {
   return randomBytes(24).toString("hex");
 }
 
-export function createJsonBackend(): Backend {
+/** @param dataDir directory for db.json (overridable for tests/isolation). */
+export function createJsonBackend(dataDir: string = DEFAULT_DATA_DIR): Backend {
+  const DATA_DIR = dataDir;
+  const DB_PATH = resolve(DATA_DIR, "db.json");
   let db: DbShape = load();
 
   function load(): DbShape {
@@ -95,6 +97,17 @@ export function createJsonBackend(): Backend {
       for (const key of PATCHABLE_USER_KEYS) {
         if (key in patch) target[key] = src[key];
       }
+      persist();
+      return clone(user);
+    },
+
+    async incrementBuildsUsed(userId) {
+      // Read-modify-write off the CURRENT stored value. There is no await between
+      // the read and the persist, so on Node's single thread this runs to
+      // completion atomically w.r.t. other increments — no lost updates.
+      const user = db.users.find((u) => u.id === userId);
+      if (!user) throw new Error(`user not found: ${userId}`);
+      user.buildsUsed += 1;
       persist();
       return clone(user);
     },

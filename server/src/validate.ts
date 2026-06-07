@@ -19,18 +19,36 @@ export interface ValidationResult {
 }
 
 let browserPromise: Promise<Browser> | null = null;
-function getBrowser(): Promise<Browser> {
+async function getBrowser(): Promise<Browser> {
   // `channel: "chromium"` uses the full Chromium build with the new headless
   // mode, avoiding the separate chromium-headless-shell download.
-  if (!browserPromise) browserPromise = chromium.launch({ channel: "chromium" });
-  return browserPromise;
+  if (browserPromise) {
+    try {
+      const b = await browserPromise;
+      if (b.isConnected()) return b;
+    } catch {
+      // a prior launch rejected — fall through and try again
+    }
+    browserPromise = null; // dead/crashed browser: drop it so we relaunch
+  }
+  const p = chromium.launch({ channel: "chromium" });
+  // Don't cache a rejected launch, or every later call would reuse the failure.
+  p.catch(() => {
+    if (browserPromise === p) browserPromise = null;
+  });
+  browserPromise = p;
+  return p;
 }
 
 export async function closeValidator(): Promise<void> {
   if (browserPromise) {
-    const b = await browserPromise;
-    await b.close();
+    const p = browserPromise;
     browserPromise = null;
+    try {
+      await (await p).close();
+    } catch {
+      // already gone / failed to launch — nothing to close
+    }
   }
 }
 
@@ -78,7 +96,6 @@ export async function validate(
       async ({ bundle, settleMs, samples }) => {
         const RT = (window as any).WildcardRuntime;
         const errs: string[] = [];
-        let ready = false;
         const mounted = RT.mountTool(document.getElementById("stage"), {
           bundle,
           storage: RT.memoryStorage(),
@@ -90,11 +107,15 @@ export async function validate(
           },
           onError: (m: string) => errs.push(m),
         });
-        // Detect the SDK 'ready' signal by racing a short wait.
+        // Let the tool settle, then confirm the frame actually mounted into the
+        // DOM with a live content window — not just that mountTool returned an
+        // object. (`mounted.frame` is always set, so checking truthiness alone
+        // would be a no-op.)
         const frame = mounted.frame as HTMLIFrameElement;
         await new Promise((r) => setTimeout(r, settleMs));
-        ready = !!frame; // mount produced a frame
-        if (!ready) errs.push("Tool frame failed to mount");
+        if (!frame.isConnected || !frame.contentWindow) {
+          errs.push("Tool frame failed to mount");
+        }
         return errs;
       },
       { bundle: bundle as any, settleMs: opts.settleMs ?? 400, samples: providerSamples() }

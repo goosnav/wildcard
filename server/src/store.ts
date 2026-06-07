@@ -63,6 +63,12 @@ export async function updateUser(userId: string, patch: Partial<import("./store/
   return (await backend()).updateUser(userId, patch);
 }
 
+/** Atomically increment a user's build count. Use this (not updateUser) to spend
+ *  a build, so concurrent generations can't lose an increment (quota integrity). */
+export async function incrementBuildsUsed(userId: string) {
+  return (await backend()).incrementBuildsUsed(userId);
+}
+
 /** All users, newest first. For the admin dashboard. */
 export async function listUsers() {
   return (await backend()).listUsers();

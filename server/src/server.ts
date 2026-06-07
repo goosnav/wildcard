@@ -7,13 +7,14 @@ import "./env.js"; // load root .env before reading any secret
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync } from "node:fs";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { generateTool, type GenEvent } from "./generate.js";
+import { closeValidator } from "./validate.js";
 import { createModel, activeProviderName } from "./provider.js";
 import {
   requestMagicLink,
@@ -24,13 +25,14 @@ import {
 import {
   userForSession,
   deleteSession,
-  updateUser,
+  incrementBuildsUsed,
   backendName,
   type User,
 } from "./store.js";
 import { quotaFor, publicUser } from "./quota.js";
 import { isAdminEmail, adminOverview } from "./admin.js";
 import { providerCatalog, callProvider } from "./providers.js";
+import { classifyPrompt } from "./safety.js";
 import {
   generateLimiter,
   netLimiter,
@@ -47,9 +49,23 @@ const SYSTEM_PROMPT = readFileSync(resolve(here, "../prompts/system.md"), "utf8"
 
 const app = new Hono();
 
+// Never emit a Referer (defense-in-depth for the magic-link token that rides in
+// the SPA URL). Cheap blanket header on every response.
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Referrer-Policy", "no-referrer");
+});
+
 // The web shell runs on a different dev origin (Vite); allow it to call us and
-// to send the Authorization header.
-app.use("/v1/*", cors({ origin: "*", allowHeaders: ["Content-Type", "Authorization"] }));
+// to send the Authorization header. In the single-container deploy the SPA and
+// API share an origin, so CORS is moot — but if you expose the API on its own
+// origin, set WC_CORS_ORIGIN to your web origin to lock it down (defaults to
+// "*" for local dev / the Vite proxy).
+const CORS_ORIGIN = process.env.WC_CORS_ORIGIN?.trim() || "*";
+app.use(
+  "/v1/*",
+  cors({ origin: CORS_ORIGIN, allowHeaders: ["Content-Type", "Authorization"] })
+);
 
 app.get("/health", async (c) =>
   c.json({
@@ -86,7 +102,7 @@ app.post("/v1/auth/verify", async (c) => {
 });
 
 // Resolve the signed-in user for everything below. 401 if absent/invalid.
-async function requireUser(c: any): Promise<User | Response> {
+async function requireUser(c: Context): Promise<User | Response> {
   const tok = bearerToken(c.req.header("Authorization"));
   const user = tok ? await userForSession(tok) : undefined;
   if (!user) return c.json({ error: "sign in required" }, 401);
@@ -95,7 +111,7 @@ async function requireUser(c: any): Promise<User | Response> {
 
 // Apply a per-user rate limit; returns a 429 Response (with Retry-After) when
 // the window is exhausted, or null to proceed.
-function rateLimit(c: any, limiter: FixedWindow, userId: string): Response | null {
+function rateLimit(c: Context, limiter: FixedWindow, userId: string): Response | null {
   const r = limiter.check(userId);
   if (r.ok) return null;
   const retryAfter = Math.ceil(r.retryAfterMs / 1000);
@@ -119,7 +135,7 @@ app.get("/v1/me", async (c) => {
 
 // Like requireUser, but additionally checks the email allow-list. 403 otherwise,
 // so a normal user can't read the roster even with a valid session.
-async function requireAdmin(c: any): Promise<User | Response> {
+async function requireAdmin(c: Context): Promise<User | Response> {
   const user = await requireUser(c);
   if (user instanceof Response) return user;
   if (!isAdminEmail(user.email)) return c.json({ error: "admin only" }, 403);
@@ -173,6 +189,26 @@ app.post("/v1/generate", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const prompt = String(body.prompt ?? "").trim();
   if (!prompt) return c.json({ error: "prompt is required" }, 400);
+  if (prompt.length > 4000)
+    return c.json({ error: "that prompt is too long — please shorten it" }, 400);
+
+  // Input safety (CMP-12): refuse clearly-harmful requests before spending any
+  // tokens, quota, or a ceiling slot. Reuse the normal SSE failure path so the
+  // client renders the honest message exactly like any other unbuildable result.
+  const verdict = classifyPrompt(prompt);
+  if (!verdict.allowed) {
+    console.warn(`[safety] refused a "${verdict.category}" prompt for user ${user.id}`);
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({
+        event: "failed",
+        data: JSON.stringify({ type: "failed", reason: verdict.message }),
+      });
+      await stream.writeSSE({
+        event: "result",
+        data: JSON.stringify({ ok: false, reason: verdict.message, quota: quotaFor(user) }),
+      });
+    });
+  }
 
   // Global COGS backstop: reserve a build slot before spending any model tokens.
   // If the period is full we shed load rather than blow the budget (REQ-NFR-006).
@@ -202,7 +238,7 @@ app.post("/v1/generate", async (c) => {
       let quotaAfter = quotaFor(user);
       if (result.ok) {
         committed = true; // keep the reserved ceiling slot for a real build
-        const updated = await updateUser(user.id, { buildsUsed: user.buildsUsed + 1 });
+        const updated = await incrementBuildsUsed(user.id);
         quotaAfter = quotaFor(updated);
       }
 
@@ -286,10 +322,29 @@ if (WEB_DIR) {
 }
 
 const port = Number(process.env.PORT ?? 8787);
-serve({ fetch: app.fetch, port });
+const server = serve({ fetch: app.fetch, port });
 backendName().then((store) =>
   console.log(
     `Wild Card generation server on http://localhost:${port} ` +
       `(provider: ${activeProviderName()}, store: ${store})`
   )
 );
+
+// Graceful shutdown: close the headless Chromium the validator manages (an
+// otherwise-unmanaged subprocess) and stop accepting connections, so a
+// container stop/redeploy doesn't leak a browser process.
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] ${signal} received — closing validator + server`);
+  try {
+    await closeValidator();
+  } catch (e) {
+    console.error("[shutdown] validator close failed:", e);
+  }
+  server.close();
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

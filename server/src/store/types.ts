@@ -47,6 +47,10 @@ export interface Backend {
   findUserByStripeCustomer(customerId: string): Promise<User | undefined>;
   createUser(email: string): Promise<User>;
   updateUser(userId: string, patch: Partial<User>): Promise<User>;
+  /** Atomically bump buildsUsed by 1 based on the CURRENT stored value, so two
+   *  concurrent builds can't both read the same count and lose an increment
+   *  (a quota/revenue leak). Returns the updated user. */
+  incrementBuildsUsed(userId: string): Promise<User>;
   /** All users, newest first (for the admin dashboard). */
   listUsers(): Promise<User[]>;
 

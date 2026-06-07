@@ -73,6 +73,11 @@ its system libraries are already present and version-matched.
 > `server/Dockerfile` in sync with the `@playwright/test` version in
 > `package.json` (currently **1.60.0**).
 
+> **Running outside this image?** The validator launches Chromium with
+> `channel: "chromium"`, so a non-Docker host (or a slim base image) must have
+> Playwright's browser installed first: `npx playwright install --with-deps
+> chromium`. Without it, generation fails at the validation step.
+
 ---
 
 ## 3. Provision Postgres
@@ -151,7 +156,30 @@ edge-caching for the shell. The single container in §2 is the recommended start
 - [ ] Free quota stops at 3 builds; the paywall opens Stripe checkout.
 - [ ] Complete a test subscription; the webhook flips the account to **pro** (no quota cap).
 - [ ] Your admin email sees the **Dashboard**; a normal user gets 403 on `/v1/admin/overview`.
+- [ ] `GET /health` shows `guard.buildCeiling` with your configured limit (the COGS cap).
 - [ ] The old OpenRouter dev key is rotated/revoked.
+
+---
+
+## Spend + abuse guard (REQ-NFR-006)
+
+The server caps spend itself, independent of per-user quota:
+
+- **Per-user rate limits** on the costly endpoints — `WC_RL_GENERATE_PER_MIN`
+  (default 5) and `WC_RL_NET_PER_MIN` (default 60). Exceeding them returns `429`
+  with a `Retry-After` header.
+- **Global build ceiling** — `WC_BUILD_CEILING` (default 1000 builds /
+  `WC_BUILD_CEILING_PERIOD_MS`, default 24h). Since each *shipped* build is the
+  unit of model spend, this hard-caps the bill even under a spike or a leaked
+  credential; over the cap, generation returns `503 at_capacity`. Failed builds
+  release their slot, so only real tools count. Watch `guard.buildCeiling` on
+  `/health`.
+
+> **One instance only.** These counters live in-process, which is correct for
+> the single-container deploy above. If you run **multiple** instances behind a
+> load balancer, each keeps its own counters, so the effective limits multiply.
+> Moving to a shared store (Redis or a Postgres counter) is the change needed
+> before horizontal scaling — it is intentionally deferred for the v1 slice.
 
 ---
 

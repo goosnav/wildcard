@@ -85,10 +85,21 @@ const COLUMN: Record<string, string | undefined> = TO_COLUMN;
 
 /** Create the Postgres backend and ensure its schema exists before returning. */
 export async function createPgBackend(databaseUrl: string): Promise<Backend> {
-  // Hosted Postgres (Supabase/Neon) requires TLS; allow self-signed chains.
+  // TLS policy:
+  //  - `sslmode=disable` in the URL → no TLS (local Postgres).
+  //  - WC_DB_CA_CERT set (a PEM string) → verify the server cert against it.
+  //  - WC_DB_SSL_STRICT=1 → verify against the system CA store.
+  //  - default → encrypted but cert verification off. Hosted Postgres
+  //    (Supabase/Neon) commonly presents chains Node won't verify out of the
+  //    box; this keeps zero-config setup working. Set one of the options above
+  //    to defend against an active MITM on the DB connection.
+  const ca = process.env.WC_DB_CA_CERT?.trim();
+  const strict = process.env.WC_DB_SSL_STRICT === "1";
   const ssl = /\bsslmode=disable\b/.test(databaseUrl)
     ? undefined
-    : { rejectUnauthorized: false };
+    : ca
+      ? { ca, rejectUnauthorized: true }
+      : { rejectUnauthorized: strict };
   const pool = new Pool({ connectionString: databaseUrl, ssl });
   await pool.query(SCHEMA);
 
@@ -141,6 +152,17 @@ export async function createPgBackend(databaseUrl: string): Promise<Backend> {
       const updated = await oneUser(
         `UPDATE users SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
         params
+      );
+      if (!updated) throw new Error(`user not found: ${userId}`);
+      return updated;
+    },
+
+    async incrementBuildsUsed(userId) {
+      // Atomic at the database: the read and write are one statement, so
+      // concurrent builds can't lose an increment even across processes.
+      const updated = await oneUser(
+        "UPDATE users SET builds_used = builds_used + 1 WHERE id = $1 RETURNING *",
+        [userId]
       );
       if (!updated) throw new Error(`user not found: ${userId}`);
       return updated;

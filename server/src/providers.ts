@@ -36,6 +36,34 @@ interface Provider extends ProviderInfo {
 
 class ProviderError extends Error {}
 
+/** Read a response body as text, but stop and throw once it exceeds `maxBytes`
+ *  — so a malicious/buggy upstream can't exhaust memory. Checks the advertised
+ *  Content-Length first (cheap early reject), then enforces the real byte count
+ *  while streaming in case the header lies or is absent. */
+async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new ProviderError("upstream payload too large");
+  }
+  if (!res.body) return res.text();
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let out = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel();
+      throw new ProviderError("upstream payload too large");
+    }
+    out += decoder.decode(value, { stream: true });
+  }
+  return out + decoder.decode();
+}
+
 // --- small upstream fetch helper (timeout + size cap, JSON only) ---
 
 async function getJson(url: string): Promise<any> {
@@ -47,8 +75,7 @@ async function getJson(url: string): Promise<any> {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) throw new ProviderError(`upstream returned ${res.status}`);
-    const text = await res.text();
-    if (text.length > MAX_RESPONSE_BYTES) throw new ProviderError("upstream payload too large");
+    const text = await readCapped(res, MAX_RESPONSE_BYTES);
     return JSON.parse(text);
   } catch (e) {
     if (e instanceof ProviderError) throw e;
