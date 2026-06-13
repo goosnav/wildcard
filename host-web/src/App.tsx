@@ -5,6 +5,7 @@ import {
   getManifest,
   verifyMagicLink,
   logout,
+  deleteAccount,
   getSession,
   type GenEvent,
   type AuthUser,
@@ -15,6 +16,7 @@ import {
   getAllTools,
   putTool,
   deleteTool as deleteToolFromDb,
+  clearAllLocalData,
   type SavedTool,
 } from "./idb";
 import { PromptBar } from "./components/PromptBar";
@@ -27,11 +29,13 @@ import { LegalLinks, LegalModal, type LegalDocId } from "./components/Legal";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { Account } from "./components/Account";
 
 type View =
   | { name: "home" }
   | { name: "build" }
   | { name: "admin" }
+  | { name: "account" }
   | { name: "run"; tool: SavedTool; tab: "run" | "source" };
 
 export default function App() {
@@ -141,6 +145,31 @@ export default function App() {
     setTools((prev) => prev.filter((t) => t.manifest.id !== tool.manifest.id));
   }
 
+  // Export the whole library as a JSON download (REQ-DATA-004).
+  function exportAllTools() {
+    const payload = {
+      app: "wildcard",
+      exportedAt: new Date().toISOString(),
+      tools,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wildcard-tools.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Delete the account server-side, then wipe all local data and sign out.
+  async function handleDeleteAccount() {
+    await deleteAccount(); // cancels subscription + clears the session
+    await clearAllLocalData();
+    setTools([]);
+    setUser(null);
+    setView({ name: "home" });
+  }
+
   // Persist a hand-edited source bundle and re-run it. Same manifest id, so the
   // tool keeps its place on the grid and its WC.storage data (REQ-EDIT-004).
   async function saveToolSource(tool: SavedTool, files: SavedTool["files"]) {
@@ -242,6 +271,13 @@ export default function App() {
           >
             {quotaLabel}
           </button>
+          <button
+            className={`account-link${view.name === "account" ? " active" : ""}`}
+            onClick={() => setView({ name: "account" })}
+            title="Account & settings"
+          >
+            ⚙
+          </button>
           <button className="signout" onClick={signOut} title="Sign out">
             ⎋
           </button>
@@ -254,6 +290,16 @@ export default function App() {
         )}
 
         {view.name === "admin" && <AdminDashboard />}
+
+        {view.name === "account" && (
+          <Account
+            user={user}
+            toolCount={tools.length}
+            billingEnabled={manifest?.features.billing ?? false}
+            onExportAll={exportAllTools}
+            onDeleteAccount={handleDeleteAccount}
+          />
+        )}
 
         {view.name === "home" && (
           <HomeGrid

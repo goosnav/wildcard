@@ -27,6 +27,7 @@ import {
   userForSession,
   deleteSession,
   incrementBuildsUsed,
+  deleteUser,
   backendName,
   type User,
 } from "./store.js";
@@ -158,6 +159,19 @@ app.get("/v1/me", async (c) => {
   const user = await requireUser(c);
   if (user instanceof Response) return user;
   return c.json({ user: publicUser(user) });
+});
+
+// Delete the signed-in user's account and all server-side data (REQ-ACCT-004).
+// Cancels any active subscription first so they stop being billed. The client is
+// responsible for clearing its own local tools/IndexedDB.
+app.delete("/v1/me", async (c) => {
+  const user = await requireUser(c);
+  if (user instanceof Response) return user;
+  if (user.stripeSubscriptionId && stripe.isConfigured()) {
+    await stripe.cancelSubscription(user.stripeSubscriptionId);
+  }
+  await deleteUser(user.id);
+  return c.json({ ok: true });
 });
 
 // --- admin (allow-listed admin email) ---
@@ -324,6 +338,25 @@ app.post("/v1/billing/checkout", async (c) => {
     return c.json({ url });
   } catch (e) {
     const message = e instanceof Error ? e.message : "checkout failed";
+    return c.json({ error: message }, 502);
+  }
+});
+
+// Open the Stripe Billing Portal so a subscriber can manage or cancel their plan.
+app.post("/v1/billing/portal", async (c) => {
+  const user = await requireUser(c);
+  if (user instanceof Response) return user;
+  if (!stripe.isConfigured()) {
+    return c.json({ error: "billing is not set up yet", reason: "billing_unconfigured" }, 503);
+  }
+  if (!user.stripeCustomerId) {
+    return c.json({ error: "no subscription to manage", reason: "no_customer" }, 409);
+  }
+  try {
+    const url = await stripe.createBillingPortalSession(user.stripeCustomerId);
+    return c.json({ url });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "could not open billing portal";
     return c.json({ error: message }, 502);
   }
 });

@@ -175,6 +175,16 @@ export async function createPgBackend(databaseUrl: string): Promise<Backend> {
       return rows.map(rowToUser);
     },
 
+    async deleteUser(userId) {
+      // sessions cascade via ON DELETE CASCADE; clear this user's magic tokens too.
+      const { rows } = await pool.query<{ email: string }>(
+        "DELETE FROM users WHERE id = $1 RETURNING email",
+        [userId]
+      );
+      const email = rows[0]?.email;
+      if (email) await pool.query("DELETE FROM magic_tokens WHERE email = $1", [email]);
+    },
+
     async createMagicToken(email) {
       const mt: MagicToken = {
         token: tokenStr(),

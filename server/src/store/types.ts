@@ -53,6 +53,9 @@ export interface Backend {
   incrementBuildsUsed(userId: string): Promise<User>;
   /** All users, newest first (for the admin dashboard). */
   listUsers(): Promise<User[]>;
+  /** Delete a user and all their server-side data (sessions, tokens). Idempotent:
+   *  deleting an unknown id is a no-op. (REQ-ACCT-004 — account deletion.) */
+  deleteUser(userId: string): Promise<void>;
 
   // magic-link tokens (single-use)
   createMagicToken(email: string): Promise<MagicToken>;

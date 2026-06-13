@@ -46,6 +46,21 @@ describe("incrementBuildsUsed (atomic, B1)", () => {
   });
 });
 
+describe("deleteUser (REQ-ACCT-004)", () => {
+  it("removes the user and their sessions, and is idempotent", async () => {
+    const user = await store.createUser("gone@example.com");
+    const session = await store.createSession(user.id);
+    expect(await store.userForSession(session.token)).toBeTruthy();
+
+    await store.deleteUser(user.id);
+    expect(await store.findUserById(user.id)).toBeUndefined();
+    expect(await store.userForSession(session.token)).toBeUndefined(); // session gone too
+
+    // Deleting again is a no-op, not an error.
+    await expect(store.deleteUser(user.id)).resolves.toBeUndefined();
+  });
+});
+
 describe("consumeMagicToken (single-use + expiry, T3)", () => {
   it("returns the email once, then null on reuse", async () => {
     const mt = await store.createMagicToken("once@example.com");

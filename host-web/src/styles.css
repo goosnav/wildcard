@@ -74,6 +74,7 @@ body {
   cursor: pointer;
 }
 .quota-badge.quota-empty { color: var(--accent-2); border-color: var(--accent); }
+.account-link,
 .signout {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -83,7 +84,43 @@ body {
   border-radius: 999px;
   cursor: pointer;
 }
+.account-link:hover,
 .signout:hover { color: var(--text); }
+.account-link.active { color: var(--accent-2); border-color: var(--accent); }
+
+/* Account view */
+.account-view { padding: 8px 0 32px; max-width: 560px; }
+.account-h { margin: 8px 0 16px; font-size: 20px; }
+.account-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.account-card.account-danger { border-color: #5a2330; }
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+}
+.account-label { color: var(--muted); }
+.account-sub { margin: 0 0 6px; font-size: 14px; }
+.account-note { margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.account-btn {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.account-btn:disabled { opacity: 0.45; cursor: default; }
+.account-btn-danger { background: #7a2738; border-color: transparent; color: #fff; }
+.account-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; }
+.account-error { color: var(--accent-2); font-size: 13px; margin-top: 10px; }
 
 /* Sign-in */
 .signin {

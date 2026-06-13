@@ -74,6 +74,11 @@ export async function listUsers() {
   return (await backend()).listUsers();
 }
 
+/** Delete a user and all their server-side data (REQ-ACCT-004). */
+export async function deleteUser(userId: string) {
+  return (await backend()).deleteUser(userId);
+}
+
 // --- magic-link tokens (single-use) ---
 
 export async function createMagicToken(email: string) {

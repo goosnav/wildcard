@@ -123,6 +123,30 @@ export async function logout(): Promise<void> {
   clearSession();
 }
 
+/** Delete the account server-side (cancels any subscription) and clear the local
+ *  session. The caller is responsible for wiping local IndexedDB. */
+export async function deleteAccount(): Promise<void> {
+  const res = await fetch("/v1/me", { method: "DELETE", headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error ?? "Couldn't delete your account.");
+  }
+  clearSession();
+}
+
+/** Open the Stripe Billing Portal to manage/cancel a subscription. */
+export async function startBillingPortal(): Promise<
+  { ok: true; url: string } | { ok: false; reason: string; message: string }
+> {
+  const res = await fetch("/v1/billing/portal", {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  if (res.ok) return { ok: true, ...(await res.json()) };
+  const j = await res.json().catch(() => ({}));
+  return { ok: false, reason: j.reason ?? "error", message: j.error ?? "Couldn't open billing." };
+}
+
 // --- admin ---
 
 /** Owner-only roster + revenue roll-up. Throws on 403 (not an admin) or error. */

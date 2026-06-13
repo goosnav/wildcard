@@ -119,6 +119,15 @@ export function createJsonBackend(dataDir: string = DEFAULT_DATA_DIR): Backend {
         .map((u) => clone(u));
     },
 
+    async deleteUser(userId) {
+      const user = db.users.find((u) => u.id === userId);
+      db.users = db.users.filter((u) => u.id !== userId);
+      db.sessions = db.sessions.filter((s) => s.userId !== userId);
+      // Magic tokens are keyed by email; drop any belonging to this user too.
+      if (user) db.magicTokens = db.magicTokens.filter((m) => m.email !== user.email);
+      persist();
+    },
+
     async createMagicToken(email) {
       const mt: MagicToken = {
         token: tokenStr(),
