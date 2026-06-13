@@ -28,7 +28,9 @@ These are the items blocking the v1.1 public web launch. Order is approximate; t
 ### Hardening the v1.1 surface (do these in parallel with the launch prep)
 
 - [ ] **Edit-with-AI versioning + revert** (REQ-GEN-006) → CMP-03
-- [ ] **Editable source view + "Run" that re-validates** (REQ-EDIT-002/003/004) → CMP-01 + CMP-05
+- [x] **Editable source view + Save & Run** (REQ-EDIT-002/004) → `SourceView.tsx` (edit any file, persists, re-runs in the sandbox). *Manual edits run locally without the server validator; **edit-with-AI** (`EditBar.tsx`) does go through full generate+validate.*
+- [x] **Edit-with-AI** (REQ-EDIT-003) → `EditBar.tsx` + `generate.ts` `editBase`; keeps the tool id, inherits safety/quota/rate-limit/ceiling.
+- [ ] **Edit-with-AI version history + revert** (REQ-GEN-006) → keep prior bundles so a user can roll back a bad edit.
 - [ ] **Home grid: long-press menu, drag-reorder, folders** (REQ-HOME-002/003/004) → CMP-01
 - [ ] **Per-user rate-limit + token-budget middleware** (REQ-SEC-003, REQ-NFR-006) → CMP-09 + CMP-13
 - [ ] **Cost / success / latency dashboards** (REQ-NFR-003, Doc 08 §8.5) → CMP-13

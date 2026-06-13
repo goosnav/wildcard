@@ -237,13 +237,17 @@ first-try success on the starter corpus is ~92% (above the 85% target).
 phase status, the full REQ → CMP → test traceability matrix, the API surface
 vs. the v1.0 contract, the eval headline, and the open-question tracker.
 
-**To ship it, see [`DEPLOY.md`](DEPLOY.md)** — services to connect (AI provider,
-Postgres, Resend, Stripe), the Docker build, and a post-deploy checklist.
+**To set up the external accounts, see [`SETUP.md`](SETUP.md)** — a step-by-step,
+service-by-service guide (OpenRouter/Anthropic, Neon Postgres, Resend email,
+Stripe billing incl. the webhook, your domain, and admin access) with the exact
+env var for each. **To ship it, see [`DEPLOY.md`](DEPLOY.md)** — the Docker build,
+host setup, and a post-deploy checklist.
 
-Still ahead: server-proxied data providers, prompt-cache cost tuning, a larger
-eval corpus, the React Native wrap for iOS/Android, and the compliance items
-that gate a store submission. See the build plan and the `dev/` bible for the
-full roadmap. Working title "Wild Card" pending a trademark/name check (OQ-01).
+Still ahead: edit-with-AI version history/revert, home-grid polish, the
+model-based moderation pass, a larger eval corpus, the React Native wrap for
+iOS/Android, and the compliance items that gate a store submission. See the
+build plan and the `dev/` bible for the full roadmap. Working title "Wild Card"
+pending a trademark/name check (OQ-01).
 
 ## Program docs
 
@@ -253,6 +257,7 @@ full roadmap. Working title "Wild Card" pending a trademark/name check (OQ-01).
 | [`ROADMAP.md`](ROADMAP.md) | Phased checklist. The "v1.1 next-up" list at the top is the concrete work to ship the v1.1 web launch. |
 | [`SPRINTS.md`](SPRINTS.md) | 2-week iteration log. Sprint 1 is backfilled from git log; future sprints start blank. |
 | [`COMPLIANCE.md`](COMPLIANCE.md) | The Doc 07 §7.6 checklist, tracked. A v1.1-only "pre-launch web gate" subset at the bottom. |
+| [`SETUP.md`](SETUP.md) | Connect-the-services guide: every external account (AI provider, Postgres, Resend, Stripe + webhook, domain, admin) with the exact env var and a verification checklist. |
 | [`DEPLOY.md`](DEPLOY.md) | Solo-deploy guide. |
 | [`AGENTS.md`](AGENTS.md) | Invariants + architecture map + commands for any contributor (human or AI). |
 | [`dev/00..09`](dev/) | The product specification ("app bible"), baselined v1.0. |

@@ -12,7 +12,7 @@ Last updated: 2026-06-07.
 
 The **v1.1 web slice is built and deployable.** The spine runs end-to-end: runtime isolation in a sandboxed iframe, Tier-1 generation with a validator-gated repair loop, a React + Vite PWA shell, local-first tool storage, magic-link accounts, a server-enforced free-build quota, Stripe paywall, allow-listed admin dashboard, server-side rate limits + a build-cost ceiling, server-proxied live-data providers, and a regression eval harness. Live first-try success measured ~92% on the original 27-prompt starter set (above the 85% target); the corpus has since grown to 52 prompts with harder multi-feature/edge cases that have not yet had a paid live run. A solo-deployable single-container `server/Dockerfile` exists.
 
-**What's not done yet:** see the Phase table below, the REQ → CMP → test matrix further down, and the OQ status section near the bottom. The pre-public-launch gap is mainly P2 polish (home grid long-press + drag + folders, editable source view, edit-with-AI versioning), CMP-12 (a conservative input-safety pre-filter now refuses clearly-harmful prompts before any token spend — `server/src/safety.ts` + `eval/disallowed.jsonl`; the model-based moderation pass and the output-side check are still pending), the `/v1/manifest` and `/v1/reports` endpoints, the Privacy Policy / ToS, and bringing the eval corpus up from 52 to ≥200 prompts.
+**What's not done yet:** see the Phase table below, the REQ → CMP → test matrix further down, and the OQ status section near the bottom. The pre-public-launch gap is mainly P2 polish (home grid long-press + drag + folders, edit-with-AI **version history / revert**), CMP-12 (a conservative input-safety pre-filter now refuses clearly-harmful prompts before any token spend — `server/src/safety.ts` + `eval/disallowed.jsonl`; the model-based moderation pass and the output-side check are still pending), the `/v1/reports` endpoint, the Privacy Policy / ToS, and bringing the eval corpus up from 52 to ≥200 prompts. (Editable source view, edit-with-AI, and `/v1/manifest` are now shipped.) **Account setup for all external services is documented in [`SETUP.md`](SETUP.md).**
 
 ---
 
@@ -44,7 +44,7 @@ Status: `shipped` = working in v1.1 with a test or demonstrable flow · `partial
 | REQ-GEN-003 live preview + Keep/Discard | M | shipped | CMP-01 + CMP-03 | `server/src/server.ts` (SSE), `host-web/src/components/BuildView.tsx` | manual / Playwright |
 | REQ-GEN-004 Tier-1 fast path + repair loop | M | shipped | CMP-03 | `server/src/generate.ts` (default N=3) | `server/test/generate.test.ts` |
 | REQ-GEN-005 Tier-2 agentic | S | deferred | CMP-06 | — | — |
-| REQ-GEN-006 edit-with-AI + versions + revert | M | partial | CMP-03 | `/v1/generate/{id}/repair` not yet wired | — |
+| REQ-GEN-006 edit-with-AI + versions + revert | M | partial | CMP-03 | edit-with-AI shipped (`EditBar.tsx` + `editBase`); version history / revert not yet | `server/test/generate.test.ts` |
 | REQ-GEN-007 refuse disallowed with alternative | M | partial | CMP-12 | no input/output safety screen yet | — |
 | REQ-GEN-008 honest "reduced scope" on fail | M | shipped | CMP-03 + CMP-05 | `server/src/generate.ts` (terminal branch), `server/src/validate.ts` | manual |
 | REQ-GEN-009 cheapest-model routing | S | partial | CMP-03 + CMP-04 | `server/src/provider.ts` (manual selection); no classifier | — |
@@ -81,9 +81,9 @@ Status: `shipped` = working in v1.1 with a test or demonstrable flow · `partial
 | ID | Prio | v1.1 status | Component | Implemented in | Test(s) |
 |---|---|---|---|---|---|
 | REQ-EDIT-001 viewable source | M | shipped | CMP-01 | `host-web/src/components/SourceView.tsx` | manual |
-| REQ-EDIT-002 edit + run + re-validate | M | partial | CMP-01 + CMP-05 | read-only today; ROADMAP.md | — |
-| REQ-EDIT-003 syntax highlighting + errors | S | partial | CMP-01 | no editor in v1.1 | — |
-| REQ-EDIT-004 edited code re-validated | M | deferred | CMP-05 | depends on REQ-EDIT-002 | — |
+| REQ-EDIT-002 edit + run | M | shipped | CMP-01 | `SourceView.tsx` (edit + Save & Run) | manual |
+| REQ-EDIT-003 edit-with-AI | M | shipped | CMP-03 | `EditBar.tsx`, `generate.ts` editBase, `generate.test.ts` | `server/test/generate.test.ts` |
+| REQ-EDIT-004 edited code persists in place | M | shipped | CMP-01 | same manifest id keeps grid slot + WC.storage | manual |
 
 ### Data & sync (REQ-DATA-*)
 
