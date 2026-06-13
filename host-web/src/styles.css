@@ -218,11 +218,99 @@ body {
 .appfoot {
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 16px 0 8px;
   font-size: 12px;
   color: var(--muted, #8a8a9a);
-  opacity: 0.7;
+  opacity: 0.8;
+}
+
+/* Legal links + modal */
+.legal-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legal-links button {
+  background: none;
+  border: 0;
+  color: var(--muted, #8a8a9a);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.legal-links button:hover { color: var(--text); }
+.legal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+.legal-modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  width: min(640px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.legal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.legal-head h2 { margin: 0; font-size: 17px; }
+.legal-close {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+.legal-body {
+  padding: 20px;
+  overflow: auto;
+  line-height: 1.6;
+  font-size: 14px;
+  color: var(--text);
+}
+.legal-body h3 { font-size: 14px; margin: 20px 0 6px; }
+.legal-body p { margin: 0 0 12px; }
+.legal-body ul { margin: 0 0 12px; padding-left: 20px; }
+.legal-body li { margin: 4px 0; }
+.legal-meta { color: var(--muted); font-size: 12px; }
+.legal-body a { color: var(--accent, #7c5cff); }
+
+.signin-consent {
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted, #8a8a9a);
+}
+.signin-consent button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent, #7c5cff);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.signin-foot {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
 }
 
 /* Prompt bar */

@@ -23,6 +23,7 @@ import { HomeGrid } from "./components/HomeGrid";
 import { ToolRunner } from "./components/ToolRunner";
 import { SourceView } from "./components/SourceView";
 import { EditBar } from "./components/EditBar";
+import { LegalLinks, LegalModal, type LegalDocId } from "./components/Legal";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
 import { AdminDashboard } from "./components/AdminDashboard";
@@ -42,6 +43,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [manifest, setManifest] = useState<AppManifest | null>(null);
+  const [legalDoc, setLegalDoc] = useState<LegalDocId | null>(null);
   const booted = useRef(false);
 
   // Public app config (version, live-data catalog, feature flags). Best-effort.
@@ -302,18 +304,23 @@ export default function App() {
         )}
       </main>
 
-      {manifest && (
-        <footer className="appfoot">
-          <span>Wild Card v{manifest.version}</span>
-          {manifest.providers.length > 0 && (
-            <span title={manifest.providers.map((p) => p.label).join(", ")}>
-              · {manifest.providers.length} live-data source
-              {manifest.providers.length === 1 ? "" : "s"}
-            </span>
-          )}
-        </footer>
-      )}
+      <footer className="appfoot">
+        {manifest && (
+          <span>
+            Wild Card v{manifest.version}
+            {manifest.providers.length > 0 && (
+              <span title={manifest.providers.map((p) => p.label).join(", ")}>
+                {" "}· {manifest.providers.length} live-data source
+                {manifest.providers.length === 1 ? "" : "s"}
+              </span>
+            )}
+            <span aria-hidden> · </span>
+          </span>
+        )}
+        <LegalLinks onOpen={setLegalDoc} />
+      </footer>
 
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
       {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
     </div>
   );
