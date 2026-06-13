@@ -222,12 +222,14 @@ function drainEvents(
 
 export async function generate(
   prompt: string,
-  onEvent: (e: GenEvent) => void
+  onEvent: (e: GenEvent) => void,
+  base?: Bundle
 ): Promise<GenResult> {
   const res = await fetch("/v1/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ prompt }),
+    // `base` present ⇒ the server EDITS that tool instead of building anew.
+    body: JSON.stringify(base ? { prompt, base } : { prompt }),
   });
 
   // Quota exhausted — surface the paywall instead of throwing.

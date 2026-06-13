@@ -22,6 +22,7 @@ import { BuildView, eventToLine, type BuildLine } from "./components/BuildView";
 import { HomeGrid } from "./components/HomeGrid";
 import { ToolRunner } from "./components/ToolRunner";
 import { SourceView } from "./components/SourceView";
+import { EditBar } from "./components/EditBar";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
 import { AdminDashboard } from "./components/AdminDashboard";
@@ -147,6 +148,56 @@ export default function App() {
     setView({ name: "run", tool: updated, tab: "run" });
   }
 
+  // Edit-with-AI (REQ-EDIT-003): regenerate the current tool with its source as
+  // context. Shows the same streaming build view; on success the updated tool
+  // replaces the original in place. A failed edit leaves the original untouched.
+  async function editTool(original: SavedTool, instruction: string) {
+    if (user && !user.quota.canBuild) {
+      setShowPaywall(true);
+      return;
+    }
+    setBusy(true);
+    setLines([{ text: `“${instruction}”`, kind: "status" }]);
+    setView({ name: "build" });
+    const onEvent = (e: GenEvent) => {
+      const line = eventToLine(e);
+      if (line) setLines((prev) => [...prev, line]);
+    };
+    try {
+      const result = await generate(instruction, onEvent, original);
+      applyQuota(result.quota);
+      if (result.ok) {
+        const tool: SavedTool = {
+          manifest: result.manifest,
+          files: result.files,
+          createdAt: original.createdAt, // keep its original place on the grid
+        };
+        await putTool(tool);
+        setTools((prev) =>
+          prev.some((t) => t.manifest.id === tool.manifest.id)
+            ? prev.map((t) => (t.manifest.id === tool.manifest.id ? tool : t))
+            : [tool, ...prev]
+        );
+        setView({ name: "run", tool, tab: "run" });
+      } else if (result.paywall) {
+        setView({ name: "run", tool: original, tab: "run" });
+        setShowPaywall(true);
+      } else {
+        setLines((prev) => [...prev, { text: result.reason, kind: "fail" }]);
+      }
+    } catch (err) {
+      setLines((prev) => [
+        ...prev,
+        {
+          text: err instanceof Error ? err.message : "Something went wrong editing that.",
+          kind: "fail",
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function signOut() {
     await logout();
     setUser(null);
@@ -246,6 +297,7 @@ export default function App() {
                 onSave={(files) => saveToolSource(view.tool, files)}
               />
             )}
+            <EditBar busy={busy} onSubmit={(instruction) => editTool(view.tool, instruction)} />
           </div>
         )}
       </main>

@@ -96,3 +96,34 @@ describe("generation orchestrator (REQ-GEN-002/004/008)", () => {
     expect(res.turns).toBe(1);
   });
 });
+
+describe("edit mode (REQ-EDIT-003)", () => {
+  it("feeds the current source + instruction to the model and keeps the original id", async () => {
+    let seenUser = "";
+    const model: Model = {
+      async complete({ user }) {
+        seenUser = user;
+        // The model renames the tool; the edit must still keep the base id.
+        return appBlock("GOOD", "Totally Renamed");
+      },
+    };
+    const base = {
+      manifest: { id: "tip-splitter", name: "Tip Splitter", icon: "💸", version: 1, providers: [] },
+      files: { "index.html": "<html><body>OLD-SOURCE-MARKER</body></html>" },
+    } as Bundle;
+
+    const res = await generateTool({
+      prompt: "add a reset button",
+      system: "sys",
+      model,
+      validateFn: fakeValidate,
+      editBase: base,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(seenUser).toContain("OLD-SOURCE-MARKER"); // gave the model current source
+    expect(seenUser).toContain("add a reset button"); // and the change request
+    expect(seenUser).toMatch(/complete updated/i); // asked for the full tool, not a diff
+    expect(res.bundle!.manifest.id).toBe("tip-splitter"); // overwrites the same tool
+  });
+});

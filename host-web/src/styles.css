@@ -183,6 +183,38 @@ body {
   padding-bottom: 24px;
 }
 
+.editbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+.editbar-icon { font-size: 15px; opacity: 0.8; }
+.editbar input {
+  flex: 1;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.editbar input::placeholder { color: var(--muted); }
+.editbar button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent, #7c5cff);
+  color: #fff;
+}
+.editbar button:disabled { opacity: 0.45; cursor: default; }
+
 .appfoot {
   display: flex;
   justify-content: center;

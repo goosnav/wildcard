@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { generateTool, type GenEvent } from "./generate.js";
+import type { Bundle } from "@wildcard/runtime";
 import { closeValidator } from "./validate.js";
 import { createModel, activeProviderName } from "./provider.js";
 import {
@@ -107,6 +108,34 @@ async function requireUser(c: Context): Promise<User | Response> {
   const user = tok ? await userForSession(tok) : undefined;
   if (!user) return c.json({ error: "sign in required" }, 401);
   return user;
+}
+
+// Coerce a client-supplied edit base into a Bundle, or undefined if it's not a
+// usable shape (must have a manifest id/name and an index.html). Defensive: a
+// malformed base degrades to a fresh build rather than erroring.
+function parseEditBase(base: unknown): Bundle | undefined {
+  if (!base || typeof base !== "object") return undefined;
+  const b = base as { manifest?: unknown; files?: unknown };
+  const manifest = b.manifest as Partial<Bundle["manifest"]> | undefined;
+  const files = b.files as Record<string, unknown> | undefined;
+  if (!manifest || typeof manifest.id !== "string" || typeof manifest.name !== "string")
+    return undefined;
+  if (!files || typeof files["index.html"] !== "string") return undefined;
+  // Keep only string file entries.
+  const cleanFiles: Record<string, string> = {};
+  for (const [k, v] of Object.entries(files)) if (typeof v === "string") cleanFiles[k] = v;
+  return {
+    manifest: {
+      id: manifest.id,
+      name: manifest.name,
+      icon: typeof manifest.icon === "string" ? manifest.icon : "✨",
+      version: typeof manifest.version === "number" ? manifest.version : 1,
+      providers: Array.isArray(manifest.providers)
+        ? manifest.providers.filter((p): p is string => typeof p === "string")
+        : [],
+    },
+    files: cleanFiles as Bundle["files"],
+  };
 }
 
 // Apply a per-user rate limit; returns a 429 Response (with Retry-After) when
@@ -205,6 +234,11 @@ app.post("/v1/generate", async (c) => {
   if (prompt.length > 4000)
     return c.json({ error: "that prompt is too long — please shorten it" }, 400);
 
+  // Optional edit context (REQ-EDIT-003): the client may send the current tool
+  // bundle so this generation EDITS it instead of building from scratch. Coerce
+  // it defensively — a bad shape just falls back to a fresh build.
+  const editBase = parseEditBase(body.base);
+
   // Input safety (CMP-12): refuse clearly-harmful requests before spending any
   // tokens, quota, or a ceiling slot. Reuse the normal SSE failure path so the
   // client renders the honest message exactly like any other unbuildable result.
@@ -245,6 +279,7 @@ app.post("/v1/generate", async (c) => {
         system: SYSTEM_PROMPT,
         model,
         onEvent: send,
+        editBase,
       });
 
       // Quota is spent only on a tool we actually ship — failed builds are free.
