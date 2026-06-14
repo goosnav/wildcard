@@ -50,3 +50,85 @@
 {"id": "shopping-budget", "category": "list", "prompt": "a shopping list where each item has a price and quantity, showing a running total against a budget I set"}
 {"id": "ranked-list", "category": "list", "prompt": "let me add items and drag or move them to rank them, saving the order"}
 {"id": "currency-tip", "category": "data", "prompt": "split a restaurant bill and show each person's share converted to another currency at today's rate"}
+{"id": "discount-calc", "category": "calculator", "prompt": "work out the final price after a percentage discount and show how much I saved"}
+{"id": "vat-calc", "category": "calculator", "prompt": "add or remove a sales tax percentage from a price"}
+{"id": "age-calc", "category": "calculator", "prompt": "tell me my exact age in years, months and days from my birthdate"}
+{"id": "date-diff", "category": "calculator", "prompt": "count the number of days between two dates"}
+{"id": "hours-worked", "category": "calculator", "prompt": "add up hours worked from clock-in and clock-out times and show the total pay at an hourly rate"}
+{"id": "gpa-calc", "category": "calculator", "prompt": "calculate a GPA from a list of course grades and credit hours"}
+{"id": "calorie-split", "category": "calculator", "prompt": "split a daily calorie target across meals by percentage"}
+{"id": "paint-estimator", "category": "calculator", "prompt": "estimate how many cans of paint I need from wall dimensions and coverage per can"}
+{"id": "fuel-cost", "category": "calculator", "prompt": "estimate the fuel cost of a trip from distance, fuel economy and price per gallon"}
+{"id": "aspect-ratio", "category": "calculator", "prompt": "work out the missing width or height to keep an aspect ratio"}
+{"id": "egg-timer", "category": "timer", "prompt": "an egg timer with presets for soft, medium and hard boiled"}
+{"id": "meditation-timer", "category": "timer", "prompt": "a calm meditation timer with a gentle start and end chime"}
+{"id": "speech-timer", "category": "timer", "prompt": "a presentation timer that warns me with color when I'm near my time limit"}
+{"id": "metronome", "category": "timer", "prompt": "a metronome where I set the beats per minute"}
+{"id": "subscription-tracker", "category": "tracker", "prompt": "track my monthly subscriptions and show the yearly total"}
+{"id": "weight-log", "category": "tracker", "prompt": "log my weight over time and show a simple trend"}
+{"id": "gratitude-log", "category": "tracker", "prompt": "a daily gratitude journal with three things I'm thankful for, saved by date"}
+{"id": "chore-wheel", "category": "tracker", "prompt": "assign weekly chores to people and check them off"}
+{"id": "steps-goal", "category": "tracker", "prompt": "let me log steps each day and show progress toward a goal"}
+{"id": "plant-watering", "category": "tracker", "prompt": "remind me which plants are due for watering based on how often each needs it"}
+{"id": "movie-watchlist", "category": "list", "prompt": "a movie watchlist where I mark things watched and rate them"}
+{"id": "gift-list", "category": "list", "prompt": "a gift planning list per person with budget and a bought checkbox"}
+{"id": "bucket-list", "category": "list", "prompt": "a bucket list I can add to and tick off, saved between visits"}
+{"id": "pros-cons", "category": "list", "prompt": "a pros and cons list for a decision with a simple score"}
+{"id": "restaurant-picker", "category": "generator", "prompt": "pick a random restaurant from my saved list when I can't decide"}
+{"id": "workout-generator", "category": "generator", "prompt": "generate a random bodyweight workout from a set of exercises"}
+{"id": "meal-idea", "category": "generator", "prompt": "suggest a random meal idea from ingredients I have"}
+{"id": "username-gen", "category": "generator", "prompt": "generate fun username ideas from a word I give"}
+{"id": "color-palette", "category": "generator", "prompt": "generate a random color palette of five swatches with hex codes to copy"}
+{"id": "secret-santa", "category": "generator", "prompt": "draw secret santa pairings from a list of names with no one getting themselves"}
+{"id": "story-prompt", "category": "generator", "prompt": "give me a random creative writing prompt"}
+{"id": "magic8", "category": "generator", "prompt": "a magic 8 ball that gives a random answer when I shake or tap"}
+{"id": "char-counter-tweet", "category": "notes", "prompt": "count characters as I type and warn me when I pass 280"}
+{"id": "case-converter", "category": "notes", "prompt": "convert text between uppercase, lowercase, title case and sentence case"}
+{"id": "find-replace", "category": "notes", "prompt": "paste text and do a find and replace on it"}
+{"id": "text-sorter", "category": "notes", "prompt": "sort lines of text alphabetically and remove duplicates"}
+{"id": "scratchpad-tabs", "category": "notes", "prompt": "a notepad with a few tabs that each save separately"}
+{"id": "roman-numeral", "category": "converter", "prompt": "convert between numbers and roman numerals"}
+{"id": "morse-converter", "category": "converter", "prompt": "translate text to and from morse code"}
+{"id": "binary-converter", "category": "converter", "prompt": "convert a number between decimal, binary and hexadecimal"}
+{"id": "timezone-converter", "category": "converter", "prompt": "convert a time from one city's timezone to another"}
+{"id": "shoe-size", "category": "converter", "prompt": "convert shoe sizes between US, UK and EU"}
+{"id": "speed-converter", "category": "converter", "prompt": "convert speed between mph, km/h and m/s"}
+{"id": "data-size", "category": "converter", "prompt": "convert data sizes between KB, MB, GB and TB"}
+{"id": "ip-info", "category": "utility", "prompt": "validate whether some text is a valid IPv4 address"}
+{"id": "regex-tester", "category": "utility", "prompt": "test a regular expression against sample text and highlight matches"}
+{"id": "diff-checker", "category": "utility", "prompt": "compare two blocks of text and show what changed line by line"}
+{"id": "url-encoder", "category": "utility", "prompt": "encode and decode URL components"}
+{"id": "slug-maker", "category": "utility", "prompt": "turn a title into a url-friendly slug"}
+{"id": "hash-checker", "category": "utility", "prompt": "show the length and character count breakdown of a string"}
+{"id": "qr-wifi", "category": "utility", "prompt": "make a QR code for my wifi network so guests can join"}
+{"id": "contrast-checker", "category": "utility", "prompt": "check if a text and background color pair has enough contrast to read"}
+{"id": "reaction-game", "category": "game", "prompt": "a reaction time test that measures how fast I tap when the screen changes"}
+{"id": "memory-match", "category": "game", "prompt": "a simple memory matching card game"}
+{"id": "tic-tac-toe", "category": "game", "prompt": "two-player tic tac toe on one screen"}
+{"id": "number-guess", "category": "game", "prompt": "a guess the number game with higher or lower hints"}
+{"id": "rock-paper", "category": "game", "prompt": "rock paper scissors against the computer keeping score"}
+{"id": "whack-tap", "category": "game", "prompt": "a tap-the-target game that gets faster and tracks my high score"}
+{"id": "typing-speed", "category": "game", "prompt": "a typing speed test that shows words per minute"}
+{"id": "bmr-calc", "category": "health", "prompt": "estimate my daily calorie needs from age, weight, height and activity level"}
+{"id": "water-goal", "category": "health", "prompt": "recommend a daily water intake from my weight and let me track it"}
+{"id": "ovulation-window", "category": "health", "prompt": "estimate a fertility window from the first day of my last cycle and cycle length"}
+{"id": "pace-calc", "category": "health", "prompt": "work out running pace, time or distance when I know the other two"}
+{"id": "one-rep-max", "category": "health", "prompt": "estimate my one rep max from a weight and number of reps"}
+{"id": "sleep-time", "category": "health", "prompt": "suggest bedtimes so I wake up at the end of a sleep cycle"}
+{"id": "tip-jar", "category": "finance", "prompt": "split a bill with tip and tell each person their share including odd cents"}
+{"id": "salary-breakdown", "category": "finance", "prompt": "break a yearly salary into monthly, weekly and hourly amounts"}
+{"id": "debt-snowball", "category": "finance", "prompt": "order my debts smallest to largest and show a payoff plan"}
+{"id": "roi-calc", "category": "finance", "prompt": "calculate return on investment as a percentage and profit amount"}
+{"id": "break-even", "category": "finance", "prompt": "find the break-even number of units from fixed costs, price and unit cost"}
+{"id": "crypto-cost-basis", "category": "finance", "prompt": "track the average cost basis of an asset as I add buys"}
+{"id": "flashcard-quiz", "category": "education", "prompt": "a multiple choice quiz I can build from my own questions and answers"}
+{"id": "times-tables", "category": "education", "prompt": "a times tables practice game for a number I choose"}
+{"id": "spelling-practice", "category": "education", "prompt": "a spelling practice tool that hides a word and lets me type it"}
+{"id": "periodic-lookup", "category": "education", "prompt": "look up a chemical element's symbol and atomic number from a small built-in table"}
+{"id": "phonetic-alphabet", "category": "education", "prompt": "spell a word out in the NATO phonetic alphabet"}
+{"id": "kids-counting", "category": "kids", "prompt": "a counting game with big friendly buttons for a toddler"}
+{"id": "chore-rewards", "category": "kids", "prompt": "a sticker reward chart for a kid's chores that saves their stars"}
+{"id": "drawing-pad", "category": "kids", "prompt": "a simple finger drawing pad with a few colors and a clear button"}
+{"id": "seating-chart", "category": "productivity", "prompt": "arrange guests into tables and let me move people between tables"}
+{"id": "standup-notes", "category": "productivity", "prompt": "a daily standup helper with yesterday, today and blockers that saves per day"}
+{"id": "focus-board", "category": "productivity", "prompt": "a simple kanban board with to do, doing and done columns that persists"}
