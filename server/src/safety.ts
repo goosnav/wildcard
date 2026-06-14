@@ -100,6 +100,26 @@ const RULES: Rule[] = [
   },
 ];
 
+// Output post-screen (CMP-12 / web-gate G1). The real safety guarantees for a
+// generated tool are STRUCTURAL — it runs in a null-origin sandbox under a strict
+// CSP (`connect-src 'none'`) and can only reach the network through vetted
+// providers, so it cannot exfiltrate data by construction. This screen is a thin
+// defense-in-depth layer over the generated source: it flags only a few
+// unambiguous malware markers that would never appear in a legitimate small tool,
+// so the false-positive risk is effectively nil. A hit means "don't ship it".
+const OUTPUT_BLOCKLIST =
+  /\b(keylogger|ransomware|rootkit|botnet|stalkerware|spyware|cryptominer|coinminer)\b/i;
+
+/** Screen the generated bundle's source before delivery. Returns a verdict; an
+ *  unsafe verdict should be treated as a generation failure (never shipped). */
+export function screenGeneratedSource(files: Record<string, string>): SafetyVerdict {
+  const text = Object.values(files).join("\n");
+  if (OUTPUT_BLOCKLIST.test(text)) {
+    return { allowed: false, category: "malware", message: GENERIC_REFUSAL };
+  }
+  return { allowed: true };
+}
+
 /** Classify a build prompt. Returns `{ allowed: true }` for anything that isn't
  *  a clear-cut harmful request. */
 export function classifyPrompt(prompt: string): SafetyVerdict {
