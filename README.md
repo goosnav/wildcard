@@ -91,6 +91,17 @@ wildcard/
 
 Requires **Node 20+**.
 
+**Just want to confirm it all works?** One command from the repo root:
+
+```bash
+npm install
+npm run verify                 # typecheck + unit tests + builds (fast, no keys)
+npm run verify -- --with-eval  # also runs the offline generation eval (needs Chromium)
+```
+
+It prints a green/red summary and exits non-zero on failure. The longer
+manual walkthrough is below.
+
 ```bash
 # 1. Install all workspaces
 npm install

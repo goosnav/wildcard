@@ -30,6 +30,25 @@ capability. Recommended order is top to bottom.
   You want to watch these flip to `true` / real values as you connect things:
   `{ "provider": "...", "store": "json|postgres", "email": false|true, "billing": false|true }`
 
+### Test the codebase with ONE command
+
+You don't need to remember separate test/typecheck/build commands. From the repo
+root:
+
+```bash
+npm run verify                 # typecheck + unit tests + builds (fast, no keys, no browser)
+npm run verify -- --with-eval  # also runs the offline generation eval (needs Chromium)
+```
+
+It prints a green/red summary and exits non-zero on any failure. Use the plain
+`npm run verify` for a quick "is everything healthy" check; add `--with-eval` to
+also exercise the full generate→validate pipeline against the deterministic stub
+model (no API spend). If the eval step complains about a missing browser, run
+`npx playwright install chromium` once.
+
+A short **manual UI smoke test** (after `npm run dev` in both `server/` and
+`host-web/`, or against your deployed URL) is in [§9](#9-post-setup-verification-checklist).
+
 ---
 
 ## 1. AI provider — the model that writes the tools (REQUIRED)
@@ -302,12 +321,21 @@ Run these in order against your deployed URL:
 - [ ] Sign in with a magic link — confirm the email actually arrives (via Resend).
 - [ ] Generate a tool — it appears on the grid, runs in the sandbox, and the **Source**
       tab shows its code (and lets you edit + Save & Run).
-- [ ] **Edit with AI** on a tool — describe a change, confirm it re-runs in place.
+- [ ] **Edit with AI** on a tool — describe a change, confirm it re-runs in place; the
+      **History** control then offers a one-click **Revert**.
+- [ ] On the home grid: **drag** a tile to reorder (it persists after reload), and the
+      tile's **⋯** menu can rename / duplicate / delete.
+- [ ] **⚙ Account**: **Export all tools** downloads a JSON file; **Manage subscription**
+      opens the Stripe portal (for a subscriber); **Delete account** removes server data,
+      cancels the subscription, and wipes local tools.
+- [ ] Footer **Privacy / Terms / AI-use** links open, and the sign-in screen shows the
+      consent line.
 - [ ] Free quota stops at 3 builds; the paywall opens Stripe Checkout.
 - [ ] Complete a **test** subscription → the webhook flips your account to **pro**
       (unlimited builds). Check **Developers → Webhooks** in Stripe shows 200s.
 - [ ] Your admin email sees the **Dashboard**; a normal user gets 403.
-- [ ] `GET /v1/manifest` returns version, free limit, price, and the live-data providers.
+- [ ] `GET /v1/manifest` returns version, free limit, price, and the live-data providers;
+      `GET /v1/reports` (as admin) returns the ops + moderation roll-up.
 - [ ] Rotate/disable any test keys you no longer need.
 
 ---

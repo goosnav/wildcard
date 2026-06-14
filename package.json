@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "description": "Describe a tool, get a working tool. Monorepo root.",
   "scripts": {
-    "eval": "tsx eval/run.ts"
+    "eval": "tsx eval/run.ts",
+    "verify": "bash scripts/verify.sh"
   },
   "workspaces": [
     "runtime",

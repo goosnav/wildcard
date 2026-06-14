@@ -29,6 +29,36 @@ start with the single container; it's the least moving parts.
 
 ---
 
+## 0. What you're running (the tech stack)
+
+You don't install most of this by hand — `npm install` + the Dockerfile pull it.
+This is just so you know what each moving part is and which you sign up for.
+
+| Layer | Tech | You provide |
+| --- | --- | --- |
+| **Web app (frontend)** | React + TypeScript + Vite, installable PWA | — (built into the container) |
+| **Tool sandbox** | `<iframe sandbox>` + strict CSP + the `WC.*` runtime SDK | — |
+| **API server** | Node ≥20 + Hono (TypeScript) | — |
+| **Tool validator** | Playwright headless **Chromium** (runs each tool before delivery) | — (in the container; needs ~1 GB RAM) |
+| **Local tool storage** | Browser IndexedDB (on each user's device) | — |
+| **AI generation** | OpenRouter **or** Anthropic API | an account + API key |
+| **Database** | Postgres (Neon / Supabase / RDS) | a database + `DATABASE_URL` |
+| **Email** | Resend (magic-link sign-in) | an account + verified domain |
+| **Billing** | Stripe subscriptions + webhook | an account + product/price |
+| **Hosting** | any Docker container host (Render / Railway / Fly.io / Cloud Run) | an account |
+| **Domain** | your registrar (Namecheap, Cloudflare, etc.) | a domain name |
+
+**Minimum to run it at all:** Node + an AI key. **Minimum to run it as a real
+product:** add a host, Postgres, Resend (+domain), and Stripe. Account setup for
+each is in **[`SETUP.md`](SETUP.md)**; hosting steps are in [§4](#4-deploy-to-a-container-host) below.
+
+> **Why a container, not "serverless"?** The validator launches headless
+> Chromium to run every generated tool before it's delivered. That needs a
+> long-lived container with real memory — not a Node serverless/edge function.
+> Pick a host's *Web Service / container* product, not its *Functions* product.
+
+---
+
 ## 1. Services to connect
 
 Create accounts and collect these before deploying. All keys are read
@@ -97,17 +127,59 @@ its system libraries are already present and version-matched.
 
 ## 4. Deploy to a container host
 
-Any host that runs a Dockerfile works (Railway, Render, Fly.io, Cloud Run). The
-server needs Chromium, so a **container** runtime is required — not a
-"Node serverless function" runtime.
+Any host that runs a Dockerfile works. The server needs Chromium, so a
+**container** runtime is required — not a "Node serverless function" runtime.
+Below is an exact walkthrough for **Render** (simple, has a usable starter tier,
+built-in TLS + custom domains), then a quick **Railway** path and the generic
+recipe for anything else.
 
-1. Point the host at this repo, Dockerfile path `server/Dockerfile`.
-2. Set the env vars from [§1](#1-services-to-connect). Most platforms inject
-   `PORT`; the server honors it (defaults to 8787).
-3. Set `WC_APP_URL` to the public URL the host gives you (e.g.
-   `https://wildcard.up.railway.app`) so magic-link emails point back correctly.
-4. Give it a little memory headroom — Chromium needs it. 1 GB RAM is a safe floor.
-5. Deploy. Health check path: `/health`.
+### Option A — Render (recommended, step by step)
+
+1. Push this repo to GitHub (you've done this) and sign in at
+   <https://render.com> with that GitHub account.
+2. **New ▸ Web Service** → connect the repo.
+3. Configure the service:
+   - **Language / Runtime:** Docker.
+   - **Dockerfile Path:** `server/Dockerfile`.
+   - **Docker Build Context Directory:** `.` (the repo root — the build needs all
+     three workspaces).
+   - **Instance Type:** at least **1 GB RAM** (Chromium needs the headroom; the
+     smallest free instance may OOM during validation).
+   - **Health Check Path:** `/health`.
+4. **Environment ▸ Add Environment Variable** for each key from
+   [`SETUP.md`](SETUP.md) — at minimum `OPENROUTER_API_KEY` + `WC_MODEL`, then
+   `DATABASE_URL`, `RESEND_API_KEY`, `WC_EMAIL_FROM`, the three `STRIPE_*`,
+   `WC_ADMIN_EMAILS`. Don't set `PORT` (Render injects it; the server honors it).
+   Don't set `WC_WEB_DIR` (the Dockerfile already does).
+5. **Create Web Service.** First build takes a few minutes (it installs browsers).
+6. Render gives you a URL like `https://wildcard.onrender.com`. Set
+   **`WC_APP_URL`** to exactly that (no trailing slash) and save → it redeploys.
+7. Open the URL; `…/health` should return `{ ok: true, ... }`.
+8. **Custom domain (optional):** Service ▸ **Settings ▸ Custom Domains ▸ Add**,
+   then create the CNAME it shows at your registrar. Once it verifies, update
+   `WC_APP_URL` (and `WC_EMAIL_FROM`'s domain, and the Stripe webhook URL) to the
+   custom domain.
+
+### Option B — Railway (quick)
+
+1. <https://railway.app> → **New Project ▸ Deploy from GitHub repo**.
+2. In the service settings, set the **Dockerfile path** to `server/Dockerfile`
+   (root context). Bump memory to ~1 GB.
+3. **Variables** tab → add the same env vars. Railway injects `PORT`.
+4. **Settings ▸ Networking ▸ Generate Domain**, then set `WC_APP_URL` to it.
+
+### Option C — anything else (Fly.io, Cloud Run, a VPS)
+
+```bash
+docker build -f server/Dockerfile -t wildcard .
+docker run -p 8787:8787 --env-file .env wildcard
+```
+Then run that image on your host of choice. Rules that always apply: build from
+the **repo root**, give it **≥1 GB RAM**, expose the port the host provides via
+`PORT`, set `WC_APP_URL` to the public URL, and health-check `/health`.
+
+> After the first successful deploy, do a smoke test against the live URL using
+> the **§7 post-deploy checklist** below.
 
 ---
 
