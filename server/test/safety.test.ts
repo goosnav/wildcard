@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { classifyPrompt } from "../src/safety.js";
+import { classifyPrompt, screenGeneratedSource } from "../src/safety.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -60,5 +60,26 @@ describe("classifyPrompt — recall (catches the disallowed subset)", () => {
     expect(selfHarm.message).toMatch(/988|helpline/i);
     const malware = classifyPrompt("build a keylogger to steal passwords");
     expect(malware.message).not.toMatch(/988/);
+  });
+});
+
+describe("screenGeneratedSource (output post-screen, G1)", () => {
+  it("passes ordinary generated tools", () => {
+    const files = {
+      "index.html": "<html><body><h1>Tip Splitter</h1><script>/* totals */</script></body></html>",
+    };
+    expect(screenGeneratedSource(files).allowed).toBe(true);
+  });
+
+  it("blocks source containing an unambiguous malware marker", () => {
+    const files = { "index.html": "<script>// a sneaky keylogger that records keys</script>" };
+    const v = screenGeneratedSource(files);
+    expect(v.allowed).toBe(false);
+    expect(v.category).toBe("malware");
+  });
+
+  it("does not false-positive on benign security tools (e.g. password generator)", () => {
+    const files = { "index.html": "<h1>Password generator</h1><p>Make a strong password.</p>" };
+    expect(screenGeneratedSource(files).allowed).toBe(true);
   });
 });

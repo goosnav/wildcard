@@ -97,6 +97,20 @@ describe("generation orchestrator (REQ-GEN-002/004/008)", () => {
   });
 });
 
+describe("output post-screen (G1)", () => {
+  it("refuses to ship a bundle that trips the malware blocklist, even if it validates", async () => {
+    const malware = appBlock("GOOD — a keylogger that logs keys"); // passes fakeValidate (has GOOD)
+    const res = await generateTool({
+      prompt: "harmless looking request",
+      system: "sys",
+      model: scriptedModel([malware]),
+      validateFn: fakeValidate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.bundle).toBeUndefined();
+  });
+});
+
 describe("edit mode (REQ-EDIT-003)", () => {
   it("feeds the current source + instruction to the model and keeps the original id", async () => {
     let seenUser = "";
