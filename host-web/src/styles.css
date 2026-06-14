@@ -391,6 +391,12 @@ body {
 }
 .tile {
   position: relative;
+  cursor: grab;
+}
+.tile:active { cursor: grabbing; }
+.tile-dragover .tile-launch {
+  border-color: var(--accent);
+  border-style: dashed;
 }
 .tile-launch {
   width: 100%;
@@ -415,20 +421,50 @@ body {
   text-align: center;
   padding: 0 8px;
 }
-.tile-delete {
+.tile-menu-btn {
   position: absolute;
   top: -6px;
   right: -6px;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--panel-2);
   color: var(--muted);
   cursor: pointer;
   line-height: 1;
+  font-size: 15px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
 }
-.tile-delete:hover { color: var(--fail); border-color: var(--fail); }
+.tile:hover .tile-menu-btn,
+.tile-menu-btn:focus { opacity: 1; }
+.tile-menu-btn:hover { color: var(--text); border-color: var(--accent); }
+.tile-menu {
+  position: absolute;
+  top: 22px;
+  right: -6px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.tile-menu button {
+  background: none;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tile-menu button:hover { background: var(--panel-2); }
+.tile-menu-danger { color: var(--fail); }
 
 .empty {
   text-align: center;

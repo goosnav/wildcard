@@ -147,6 +147,38 @@ export default function App() {
     setTools((prev) => prev.filter((t) => t.manifest.id !== tool.manifest.id));
   }
 
+  // Persist a new grid arrangement (REQ-HOME-002): stamp each tool with its index.
+  async function reorderTools(arranged: SavedTool[]) {
+    const ordered = arranged.map((t, i) => ({ ...t, order: i }));
+    setTools(ordered);
+    await Promise.all(ordered.map((t) => putTool(t)));
+  }
+
+  async function renameTool(tool: SavedTool, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === tool.manifest.name) return;
+    const updated: SavedTool = { ...tool, manifest: { ...tool.manifest, name: trimmed } };
+    await putTool(updated);
+    setTools((prev) =>
+      prev.map((t) => (t.manifest.id === tool.manifest.id ? updated : t))
+    );
+  }
+
+  // Duplicate a tool into a new independent tool (own id + storage).
+  async function duplicateTool(tool: SavedTool) {
+    const existing = new Set(tools.map((t) => t.manifest.id));
+    let id = `${tool.manifest.id}-copy`;
+    let n = 2;
+    while (existing.has(id)) id = `${tool.manifest.id}-copy-${n++}`;
+    const copy: SavedTool = {
+      manifest: { ...tool.manifest, id, name: `${tool.manifest.name} copy` },
+      files: tool.files,
+      createdAt: Date.now(),
+    };
+    await putTool(copy);
+    setTools((prev) => [copy, ...prev]);
+  }
+
   // Export the whole library as a JSON download (REQ-DATA-004).
   function exportAllTools() {
     const payload = {
@@ -322,6 +354,9 @@ export default function App() {
             tools={tools}
             onLaunch={(tool) => setView({ name: "run", tool, tab: "run" })}
             onDelete={deleteTool}
+            onReorder={reorderTools}
+            onRename={renameTool}
+            onDuplicate={duplicateTool}
           />
         )}
 

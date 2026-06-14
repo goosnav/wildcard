@@ -18,6 +18,9 @@ export interface SavedTool extends Bundle {
   createdAt: number;
   /** Previous versions, newest first. Capped — see HISTORY_LIMIT. */
   history?: ToolVersion[];
+  /** Explicit grid position (lower = earlier). Unset until the user reorders;
+   *  unordered tools sort to the front by recency so new builds appear first. */
+  order?: number;
 }
 
 export const HISTORY_LIMIT = 10;
@@ -82,9 +85,17 @@ interface ToolRecord extends SavedTool {
 
 export async function getAllTools(): Promise<SavedTool[]> {
   const records = await tx<ToolRecord[]>(TOOLS, "readonly", (s) => s.getAll());
-  return records
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map(({ id: _id, ...tool }) => tool);
+  return records.sort(compareTools).map(({ id: _id, ...tool }) => tool);
+}
+
+/** Grid sort order: tools the user hasn't placed yet come first by recency (so a
+ *  new build appears at the front); manually-ordered tools follow in their set
+ *  order. */
+export function compareTools(a: SavedTool, b: SavedTool): number {
+  const ao = a.order ?? -1;
+  const bo = b.order ?? -1;
+  if (ao !== bo) return ao - bo;
+  return b.createdAt - a.createdAt;
 }
 
 export async function putTool(tool: SavedTool): Promise<void> {
