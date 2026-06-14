@@ -40,6 +40,27 @@ export interface GenerateOptions {
   maxRepairTurns?: number; // default 3 (REQ-GEN-004)
   onEvent?: (e: GenEvent) => void;
   validateFn?: (b: Bundle) => Promise<ValidationResult>;
+  /** When set, this is an EDIT of an existing tool (REQ-EDIT-003): `prompt` is
+   *  the change request and the model is given the current source as context.
+   *  The result reuses the same manifest id so it overwrites the same tool. */
+  editBase?: Bundle;
+}
+
+/** Compose the turn-0 user message. For an edit, hand the model the full current
+ *  source and ask for the complete updated tool (not a diff) so packaging stays
+ *  deterministic. */
+function buildUserMessage(prompt: string, editBase?: Bundle): string {
+  if (!editBase) return prompt;
+  const files = Object.entries(editBase.files)
+    .map(([name, content]) => `\`\`\`file:${name}\n${content}\n\`\`\``)
+    .join("\n");
+  return (
+    `You are EDITING an existing tool named "${editBase.manifest.name}". ` +
+    `Here is its current source:\n\n${files}\n\n` +
+    `Apply this change: ${prompt}\n\n` +
+    `Return the COMPLETE updated <wc-app> block (every file in full, not a diff), ` +
+    `keeping everything that still works and changing only what the request needs.`
+  );
 }
 
 export async function generateTool(
@@ -52,8 +73,10 @@ export async function generateTool(
     maxRepairTurns = 3,
     onEvent = () => {},
     validateFn = validate,
+    editBase,
   } = opts;
 
+  const userMessage = buildUserMessage(prompt, editBase);
   let lastOutput = "";
   let lastErrors: string[] = [];
 
@@ -68,7 +91,7 @@ export async function generateTool(
     try {
       raw = await model.complete({
         system,
-        user: prompt,
+        user: userMessage,
         repair: turn > 0 ? { lastOutput, errors: lastErrors } : undefined,
       });
     } catch (e) {
@@ -82,7 +105,8 @@ export async function generateTool(
 
     let bundle: Bundle;
     try {
-      bundle = parseBundle(raw);
+      // On an edit, keep the original tool's id so it overwrites in place.
+      bundle = parseBundle(raw, editBase?.manifest.id);
     } catch (e) {
       if (e instanceof ContractError) {
         lastErrors = [e.message];

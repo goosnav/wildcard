@@ -29,7 +29,7 @@ export interface RequestResult {
 }
 
 export async function requestMagicLink(email: string): Promise<RequestResult> {
-  const mt = createMagicToken(email);
+  const mt = await createMagicToken(email);
   const link = `${APP_URL}/?token=${mt.token}`;
   const emailed = await sendMagicLink(email, link);
   return emailed ? { emailed } : { emailed, devLink: link };
@@ -40,11 +40,11 @@ export interface VerifyResult {
   user: User;
 }
 
-export function verifyMagicLink(magicToken: string): VerifyResult | null {
-  const email = consumeMagicToken(magicToken);
+export async function verifyMagicLink(magicToken: string): Promise<VerifyResult | null> {
+  const email = await consumeMagicToken(magicToken);
   if (!email) return null;
-  const user = upsertUser(email);
-  const session = createSession(user.id);
+  const user = await upsertUser(email);
+  const session = await createSession(user.id);
   return { sessionToken: session.token, user };
 }
 

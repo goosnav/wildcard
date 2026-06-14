@@ -74,6 +74,13 @@ export async function deleteTool(id: string): Promise<void> {
   await tx(TOOLS, "readwrite", (s) => s.delete(id));
 }
 
+/** Wipe ALL local data — every saved tool and every tool's WC.storage. Used on
+ *  account deletion so nothing is left on the device. */
+export async function clearAllLocalData(): Promise<void> {
+  await tx(TOOLS, "readwrite", (s) => s.clear());
+  await tx(KV, "readwrite", (s) => s.clear());
+}
+
 // --- per-app key-value (WC.storage backing) ---
 
 interface KvRecord {

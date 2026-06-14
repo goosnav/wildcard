@@ -29,6 +29,14 @@ Return exactly one `<wc-app>` block and nothing outside it:
 3. NETWORK is denied by default. To call a data API you must (a) list its
    provider id in `providers`, and (b) call `WC.net.fetch(provider, params)`.
    Only do this if the tool genuinely needs live data. Most tools need none.
+   You may ONLY use these providers (no other network is reachable):
+     • `weather` — current weather. params `{ latitude:Number, longitude:Number }`.
+       resolves `{ temperatureC, humidity, windSpeedKmh, conditions, weatherCode, time }`.
+     • `currency` — latest FX conversion. params `{ from:"USD", to:"EUR", amount?:Number }`.
+       resolves `{ from, to, amount, rate, result, date }`.
+   Example: `<wc-app name="..." icon="..." providers="weather">` then
+   `const w = await WC.net.fetch("weather", { latitude: lat, longitude: lon });`.
+   Always handle a rejected fetch (offline/upstream error) with a friendly message.
 4. Keep it SMALL and single-purpose. One screen, does one job well.
 5. Make it look clean and native: system font, respects light/dark via
    `color-scheme`, large tap targets, no clutter. No external CSS frameworks.

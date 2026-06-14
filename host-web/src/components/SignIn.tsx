@@ -4,12 +4,14 @@
 
 import { useState } from "react";
 import { requestMagicLink } from "../api";
+import { LegalLinks, LegalModal, type LegalDocId } from "./Legal";
 
 export function SignIn() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [devLink, setDevLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDocId | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
@@ -61,7 +63,21 @@ export function SignIn() {
             )}
           </div>
         )}
+
+        <p className="signin-consent">
+          By continuing you agree to our{" "}
+          <button onClick={() => setLegalDoc("terms")}>Terms</button> and{" "}
+          <button onClick={() => setLegalDoc("privacy")}>Privacy Policy</button>. Tool
+          descriptions you enter are sent to an AI provider to build your tool —{" "}
+          <button onClick={() => setLegalDoc("ai")}>how this works</button>.
+        </p>
       </div>
+
+      <footer className="signin-foot">
+        <LegalLinks onOpen={setLegalDoc} />
+      </footer>
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
     </div>
   );
 }

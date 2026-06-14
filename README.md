@@ -61,15 +61,27 @@ wildcard/
 │   ├── tools/      Hand-written example tool bundles (e.g. tip-splitter).
 │   └── test/       Playwright harness proving isolation, persistence, egress.
 │
-├── server/         Generation backend (CMP-03/04/05).
+├── server/         Generation backend + accounts/billing (CMP-03/04/05).
 │   ├── src/        contract.ts (strict output → bundle), generate.ts (orchestrator
 │   │               + bounded repair loop), validate.ts (headless-Chromium gate),
-│   │               anthropic-model.ts (model gateway + prompt caching), server.ts
+│   │               openrouter-/anthropic-model.ts (model gateways, 429 retry),
+│   │               store.ts (persistence facade), auth.ts (magic-link),
+│   │               quota.ts (free-build limit), admin.ts (allow-listed dashboard),
+│   │               stripe.ts + billing.ts (checkout + signed webhook),
+│   │               email.ts (Resend/dev link), server.ts (Hono)
+│   │   store/      Backends behind store.ts: json-backend.ts (default, file) and
+│   │               pg-backend.ts (Postgres when DATABASE_URL is set); types.ts.
 │   ├── prompts/    system.md — the generation system prompt.
-│   └── test/       Repair-loop + contract tests (no API key needed).
+│   ├── scripts/    store:smoke (validate the active store backend), dryrun, livegen.
+│   └── test/       Quota + repair-loop/contract tests (no API key needed).
 │
-├── host-web/       (Phase 1) React PWA shell: home grid, prompt bar, build view.
-├── eval/           (Phase 1) Regression eval corpus + runner.
+├── host-web/       React + Vite PWA shell: sign-in, home grid, prompt bar, build
+│                   view, tool runner (sandboxed iframe), source view, paywall.
+│   ├── src/        App.tsx, api.ts (server client), components/, idb.ts (local
+│   │               tool store), main.tsx; public/ has the PWA manifest + SW.
+│
+├── eval/           Regression eval: corpus.jsonl + run.ts (scores first-try +
+│                   overall pass through the real pipeline; gates on a threshold).
 └── dev/            The product specification ("app bible", read-only reference).
 ```
 
@@ -99,7 +111,16 @@ npm --workspace @wildcard/server run dryrun
 # 6. Run the generation server locally (needs a provider key — see below)
 cp .env.example .env   # then edit .env
 npm --workspace @wildcard/server run dev
+
+# 7. In another terminal, run the web app (Vite dev server on :5173, proxies /v1
+#    to the server on :8787). Sign in with any email — without RESEND_API_KEY the
+#    server prints the magic link and the UI shows a one-tap "Continue (dev)".
+npm --workspace @wildcard/host-web run dev
 ```
+
+No provider key handy? Run the whole stack offline with the deterministic stub
+model: `WC_PROVIDER=stub` in front of the server (and the eval runner) returns a
+fixed valid tool through the real validator — good for UI work and CI.
 
 ### Generation provider
 
@@ -116,6 +137,48 @@ curl -N -X POST http://localhost:8787/v1/generate \
   -H 'content-type: application/json' \
   -d '{"prompt":"a tip splitter that remembers my usual tip %"}'
 ```
+
+### Persistence (store backend)
+
+Accounts, sessions, and entitlements go through one facade (`server/src/store.ts`)
+with two interchangeable backends:
+
+- **JSON file** (default) — `server/.data/db.json`, written atomically. Zero setup;
+  good for dev and small deployments.
+- **Postgres** — active when `DATABASE_URL` is set (Neon, Supabase, RDS, …). The
+  schema is created automatically on first connect; hosted Postgres uses TLS by
+  default. Switching backends needs no code change.
+
+Validate whichever backend is configured (the same lifecycle runs against both):
+
+```bash
+npm --workspace @wildcard/server run store:smoke                     # JSON (default)
+DATABASE_URL=postgres://… npm --workspace @wildcard/server run store:smoke   # your real DB
+```
+
+### Quality eval
+
+`npm run eval` generates every prompt in `eval/corpus.jsonl` through the **same**
+orchestrator + validator the server uses, then scores first-try and overall pass
+rate, latency, and a per-category breakdown, writing a report to `eval/reports/`.
+It exits non-zero below `EVAL_MIN_PASS_RATE` so it can gate CI. The current
+corpus is 27 prompts; the v1.0 target per Doc 06 §6.2 is ≥200. The default
+gate is `0.7`; raise it to `0.85` (the v1.0 acceptance target) once the corpus
+is bigger:
+
+```bash
+EVAL_MIN_PASS_RATE=0.85 npm run eval
+```
+
+To test without spending, point it at a free OpenRouter model (slug ending in `:free`):
+
+```bash
+WC_MODEL=openai/gpt-oss-120b:free npm run eval -- --concurrency 1   # free tiers rate-limit
+WC_PROVIDER=stub npm run eval                                       # offline plumbing check
+```
+
+See [`STATUS.md`](STATUS.md) for the live eval headline and the corpus-growth
+plan in [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -161,6 +224,41 @@ preserve.
 
 ## Status
 
-Phase 0 spike — proving the spine end-to-end (runtime isolation + generation +
-validator-gated repair). See the build plan and the `dev/` bible for the full
-roadmap. Working title "Wild Card" pending a trademark/name check (OQ-01).
+**Lean web slice — functionally complete and deployable.** The spine runs
+end-to-end: runtime isolation, Tier-1 generation with a validator-gated repair
+loop, a React PWA shell, local-first tool storage, magic-link accounts, a
+server-enforced free-build quota, a Stripe paywall, and an allow-listed admin
+dashboard — with a regression eval harness gating quality. Persistence runs on a
+local JSON file or Postgres (`DATABASE_URL`); magic links deliver via Resend; and
+a single-container `server/Dockerfile` serves both the API and the web app. Live
+first-try success on the starter corpus is ~92% (above the 85% target).
+
+**The headline is moving to [`STATUS.md`](STATUS.md).** It carries the live
+phase status, the full REQ → CMP → test traceability matrix, the API surface
+vs. the v1.0 contract, the eval headline, and the open-question tracker.
+
+**To set up the external accounts, see [`SETUP.md`](SETUP.md)** — a step-by-step,
+service-by-service guide (OpenRouter/Anthropic, Neon Postgres, Resend email,
+Stripe billing incl. the webhook, your domain, and admin access) with the exact
+env var for each. **To ship it, see [`DEPLOY.md`](DEPLOY.md)** — the Docker build,
+host setup, and a post-deploy checklist.
+
+Still ahead: edit-with-AI version history/revert, home-grid polish, the
+model-based moderation pass, a larger eval corpus, the React Native wrap for
+iOS/Android, and the compliance items that gate a store submission. See the
+build plan and the `dev/` bible for the full roadmap. Working title "Wild Card"
+pending a trademark/name check (OQ-01).
+
+## Program docs
+
+| Doc | Purpose |
+|---|---|
+| [`STATUS.md`](STATUS.md) | Live state: phase table, REQ → CMP → test matrix, API surface, eval headline, OQ status. **Read first.** |
+| [`ROADMAP.md`](ROADMAP.md) | Phased checklist. The "v1.1 next-up" list at the top is the concrete work to ship the v1.1 web launch. |
+| [`SPRINTS.md`](SPRINTS.md) | 2-week iteration log. Sprint 1 is backfilled from git log; future sprints start blank. |
+| [`COMPLIANCE.md`](COMPLIANCE.md) | The Doc 07 §7.6 checklist, tracked. A v1.1-only "pre-launch web gate" subset at the bottom. |
+| [`SETUP.md`](SETUP.md) | Connect-the-services guide: every external account (AI provider, Postgres, Resend, Stripe + webhook, domain, admin) with the exact env var and a verification checklist. |
+| [`DEPLOY.md`](DEPLOY.md) | Solo-deploy guide. |
+| [`AGENTS.md`](AGENTS.md) | Invariants + architecture map + commands for any contributor (human or AI). |
+| [`dev/00..09`](dev/) | The product specification ("app bible"), baselined v1.0. |
+| [`dev/10_WEB_SLICE_BASELINE_v1.1.txt`](dev/10_WEB_SLICE_BASELINE_v1.1.txt) | The v1.1 overlay — reconciles the v1.0 bible with the web slice actually being shipped. |

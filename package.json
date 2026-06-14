@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "description": "Describe a tool, get a working tool. Monorepo root.",
+  "scripts": {
+    "eval": "tsx eval/run.ts"
+  },
   "workspaces": [
     "runtime",
     "server",

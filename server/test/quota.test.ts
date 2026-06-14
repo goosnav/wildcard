@@ -47,6 +47,7 @@ describe("quota policy", () => {
       id: "usr_test",
       email: "a@b.com",
       quota: expect.objectContaining({ plan: "free" }),
+      isAdmin: false,
     });
     expect(JSON.stringify(pub)).not.toContain("cus_x");
     expect(JSON.stringify(pub)).not.toContain("sub_x");

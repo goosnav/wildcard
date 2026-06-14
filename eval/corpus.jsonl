@@ -1,0 +1,52 @@
+{"id": "tip-splitter", "category": "calculator", "prompt": "a tip splitter that remembers my usual tip percentage"}
+{"id": "percentage-calc", "category": "calculator", "prompt": "a calculator for working out percentages of a number"}
+{"id": "bmi-calc", "category": "calculator", "prompt": "a BMI calculator that takes height and weight"}
+{"id": "loan-payment", "category": "calculator", "prompt": "work out the monthly payment on a loan from amount, rate and years"}
+{"id": "unit-converter", "category": "calculator", "prompt": "convert miles to kilometers and back"}
+{"id": "temp-converter", "category": "calculator", "prompt": "a temperature converter between celsius and fahrenheit"}
+{"id": "countdown-timer", "category": "timer", "prompt": "a countdown timer I can set in minutes"}
+{"id": "stopwatch", "category": "timer", "prompt": "a stopwatch with start, stop and reset"}
+{"id": "pomodoro", "category": "timer", "prompt": "a pomodoro timer with 25 minute work and 5 minute break"}
+{"id": "dice-roller", "category": "generator", "prompt": "a dice roller for one or two six-sided dice"}
+{"id": "coin-flipper", "category": "generator", "prompt": "a coin flipper that shows heads or tails"}
+{"id": "random-number", "category": "generator", "prompt": "pick a random number between two values I choose"}
+{"id": "password-gen", "category": "generator", "prompt": "a password generator with a length slider"}
+{"id": "team-picker", "category": "generator", "prompt": "split a list of names into two random teams"}
+{"id": "decision-spinner", "category": "generator", "prompt": "a yes or no decision maker I can tap"}
+{"id": "tally-counter", "category": "tracker", "prompt": "a tally counter that remembers the count between sessions"}
+{"id": "habit-tracker", "category": "tracker", "prompt": "a daily habit tracker with checkmarks for the week"}
+{"id": "water-tracker", "category": "tracker", "prompt": "track how many glasses of water I drink today"}
+{"id": "quick-notepad", "category": "notes", "prompt": "a quick notepad for jotting ideas that saves what I type"}
+{"id": "word-counter", "category": "notes", "prompt": "count the words and characters in some text I paste"}
+{"id": "grocery-list", "category": "list", "prompt": "a grocery checklist I can add items to and check off"}
+{"id": "todo-list", "category": "list", "prompt": "a simple todo list that persists my tasks"}
+{"id": "packing-list", "category": "list", "prompt": "a packing checklist for a trip"}
+{"id": "color-hex", "category": "utility", "prompt": "pick a color and show me its hex code to copy"}
+{"id": "weather-now", "category": "data", "prompt": "show me the current temperature and conditions for a latitude and longitude I enter"}
+{"id": "currency-convert", "category": "data", "prompt": "convert an amount from one currency to another using live exchange rates"}
+{"id": "travel-weather", "category": "data", "prompt": "tell me the weather right now for my saved home coordinates so I know how to dress"}
+{"id": "expense-splitter", "category": "calculator", "prompt": "split a bill across several people where some paid different amounts, and tell me who owes whom"}
+{"id": "compound-interest", "category": "calculator", "prompt": "show how a starting amount grows with monthly contributions and an annual interest rate over a number of years, with a year-by-year breakdown"}
+{"id": "mortgage-amortization", "category": "calculator", "prompt": "a mortgage calculator that shows the monthly payment and a full amortization schedule of principal vs interest"}
+{"id": "savings-goal", "category": "calculator", "prompt": "tell me how much to save each month to reach a goal by a target date, and remember my goal"}
+{"id": "interval-timer", "category": "timer", "prompt": "an interval workout timer where I set work and rest seconds and number of rounds, with a clear current-round display"}
+{"id": "multi-timer", "category": "timer", "prompt": "let me run several named countdown timers at once, like tea and pasta"}
+{"id": "world-clock", "category": "utility", "prompt": "show the current time in a few cities I pick and let me add or remove cities"}
+{"id": "habit-streak", "category": "tracker", "prompt": "track a daily habit and show my current streak and longest streak, saved between visits"}
+{"id": "mood-journal", "category": "tracker", "prompt": "log my mood each day on a 1 to 5 scale with an optional note, and show the last two weeks"}
+{"id": "budget-envelope", "category": "tracker", "prompt": "an envelope budget where I set category limits and log spending against them, persisting my data"}
+{"id": "reading-progress", "category": "tracker", "prompt": "track pages read across books I'm reading and show percent complete for each"}
+{"id": "flashcards", "category": "notes", "prompt": "a flashcard study tool where I add question and answer cards, flip them, and shuffle, saved locally"}
+{"id": "markdown-preview", "category": "notes", "prompt": "type markdown on the left and see formatted output on the right"}
+{"id": "json-formatter", "category": "utility", "prompt": "paste messy JSON and get it pretty-printed, with a clear message if it's invalid"}
+{"id": "csv-to-table", "category": "utility", "prompt": "paste CSV text and render it as a clean table, then let me export it back out"}
+{"id": "base64-tool", "category": "utility", "prompt": "encode and decode text to and from base64, handling errors gracefully"}
+{"id": "qr-text", "category": "generator", "prompt": "generate a QR code from text I type"}
+{"id": "lorem-ipsum", "category": "generator", "prompt": "generate a chosen number of paragraphs of placeholder text I can copy"}
+{"id": "uuid-gen", "category": "generator", "prompt": "generate a batch of random UUIDs and let me copy them"}
+{"id": "name-raffle", "category": "generator", "prompt": "paste a list of names and pick a random winner with a little suspense, without repeating past winners I've drawn"}
+{"id": "recipe-scaler", "category": "converter", "prompt": "scale a recipe's ingredient amounts up or down for a different number of servings"}
+{"id": "cooking-converter", "category": "converter", "prompt": "convert between cups, tablespoons, milliliters and grams for common cooking ingredients"}
+{"id": "shopping-budget", "category": "list", "prompt": "a shopping list where each item has a price and quantity, showing a running total against a budget I set"}
+{"id": "ranked-list", "category": "list", "prompt": "let me add items and drag or move them to rank them, saving the order"}
+{"id": "currency-tip", "category": "data", "prompt": "split a restaurant bill and show each person's share converted to another currency at today's rate"}

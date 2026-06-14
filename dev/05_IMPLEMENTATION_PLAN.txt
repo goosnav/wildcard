@@ -5,7 +5,16 @@
 
   Maps to NASA "V": IMPLEMENTATION (bottom of the V). Work breakdown, size and
   effort estimates, team, sequence, and milestones.
-  Status: BASELINE v1.0
+   Status: BASELINE v1.0
+
+   v1.1 WEB-SLICE OVERLAY: the program is currently shipping the LEAN
+   REVENUE-FIRST SLICE described in §5.6 below, not the full GA build. See
+   dev/10_WEB_SLICE_BASELINE_v1.1.txt for the v1.1 overlay that reconciles
+   this plan with the actual code, and STATUS.md (root) for the live phase
+   status, REQ -> CMP -> test matrix, and open-question tracker. ROADMAP.md
+   (root) is the phased checklist of next-up work; SPRINTS.md is the
+   2-week iteration log. The WBS in §5.2 and the phase estimates in §5.4
+   are not re-baselined here; the overlay absorbs the delta.
 
 --------------------------------------------------------------------------------
 5.1  ESTIMATION METHOD & ASSUMPTIONS (read before trusting any number)

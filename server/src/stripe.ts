@@ -58,6 +58,34 @@ export async function createCheckoutSession(user: User): Promise<string> {
   return session.url as string;
 }
 
+/** Create a Billing Portal session so a subscriber can manage or cancel their
+ *  plan and update payment details. Requires a known Stripe customer id. */
+export async function createBillingPortalSession(customerId: string): Promise<string> {
+  const session = await stripePost("/billing_portal/sessions", {
+    customer: customerId,
+    return_url: `${APP_URL()}/`,
+  });
+  return session.url as string;
+}
+
+/** Best-effort cancel of a subscription (used when a user deletes their account
+ *  so they stop being billed). Swallows errors — account deletion proceeds even
+ *  if the cancel call fails, and the webhook will reconcile. */
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  try {
+    const res = await fetch(`${API}/subscriptions/${subscriptionId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${SECRET()}` },
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.error(`[billing] cancel subscription failed: ${j?.error?.message ?? res.status}`);
+    }
+  } catch (e) {
+    console.error("[billing] cancel subscription error:", e);
+  }
+}
+
 export interface StripeEvent {
   type: string;
   data: { object: any };

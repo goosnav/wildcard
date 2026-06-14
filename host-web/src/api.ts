@@ -24,6 +24,31 @@ export interface AuthUser {
   id: string;
   email: string;
   quota: Quota;
+  isAdmin?: boolean;
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  plan: "free" | "pro";
+  buildsUsed: number;
+  createdAt: number;
+  subscribed: boolean;
+}
+
+export interface AdminOverview {
+  generatedAt: number;
+  stats: {
+    totalUsers: number;
+    freeUsers: number;
+    proUsers: number;
+    subscribedUsers: number;
+    totalBuilds: number;
+    signupsLast7d: number;
+    estimatedMrrUsd: number;
+  };
+  priceUsd: number;
+  users: AdminUserRow[];
 }
 
 export type GenResult =
@@ -98,6 +123,91 @@ export async function logout(): Promise<void> {
   clearSession();
 }
 
+/** Delete the account server-side (cancels any subscription) and clear the local
+ *  session. The caller is responsible for wiping local IndexedDB. */
+export async function deleteAccount(): Promise<void> {
+  const res = await fetch("/v1/me", { method: "DELETE", headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error ?? "Couldn't delete your account.");
+  }
+  clearSession();
+}
+
+/** Open the Stripe Billing Portal to manage/cancel a subscription. */
+export async function startBillingPortal(): Promise<
+  { ok: true; url: string } | { ok: false; reason: string; message: string }
+> {
+  const res = await fetch("/v1/billing/portal", {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  if (res.ok) return { ok: true, ...(await res.json()) };
+  const j = await res.json().catch(() => ({}));
+  return { ok: false, reason: j.reason ?? "error", message: j.error ?? "Couldn't open billing." };
+}
+
+// --- admin ---
+
+/** Owner-only roster + revenue roll-up. Throws on 403 (not an admin) or error. */
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const res = await fetch("/v1/admin/overview", { headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error ?? `Failed to load admin overview (${res.status})`);
+  }
+  return res.json();
+}
+
+// --- app manifest (public self-config) ---
+
+export interface ProviderInfo {
+  id: string;
+  label: string;
+  description: string;
+  params: { name: string; type: string; required: boolean; description: string }[];
+}
+
+export interface AppManifest {
+  version: string;
+  freeBuildLimit: number;
+  priceUsd: number;
+  providers: ProviderInfo[];
+  features: { billing: boolean; email: boolean };
+}
+
+/** Public app config — version, free allowance, price, live-data catalog, and
+ *  which optional features are wired. No auth; safe to call before sign-in. */
+export async function getManifest(): Promise<AppManifest | null> {
+  try {
+    const res = await fetch("/v1/manifest");
+    if (!res.ok) return null;
+    return (await res.json()) as AppManifest;
+  } catch {
+    return null;
+  }
+}
+
+// --- data providers (server-proxied egress) ---
+
+/** Call a server-proxied data provider on behalf of a running tool. The runtime
+ *  has already checked the provider is declared in the tool's manifest; the
+ *  server re-checks it against the fixed catalog and makes the upstream call.
+ *  Returns the provider's data, or throws with the server's error message. */
+export async function callProvider(
+  provider: string,
+  params: Record<string, unknown>
+): Promise<unknown> {
+  const res = await fetch(`/v1/net/${encodeURIComponent(provider)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ params }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? `provider "${provider}" failed (${res.status})`);
+  return j.data;
+}
+
 // --- billing ---
 
 export async function startCheckout(): Promise<
@@ -136,12 +246,14 @@ function drainEvents(
 
 export async function generate(
   prompt: string,
-  onEvent: (e: GenEvent) => void
+  onEvent: (e: GenEvent) => void,
+  base?: Bundle
 ): Promise<GenResult> {
   const res = await fetch("/v1/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ prompt }),
+    // `base` present ⇒ the server EDITS that tool instead of building anew.
+    body: JSON.stringify(base ? { prompt, base } : { prompt }),
   });
 
   // Quota exhausted — surface the paywall instead of throwing.

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { Bundle } from "@wildcard/runtime";
+import { providerSamples, isProvider } from "./providers.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_GLOBAL = resolve(here, "../../runtime/dist/runtime.global.js");
@@ -18,18 +19,36 @@ export interface ValidationResult {
 }
 
 let browserPromise: Promise<Browser> | null = null;
-function getBrowser(): Promise<Browser> {
+async function getBrowser(): Promise<Browser> {
   // `channel: "chromium"` uses the full Chromium build with the new headless
   // mode, avoiding the separate chromium-headless-shell download.
-  if (!browserPromise) browserPromise = chromium.launch({ channel: "chromium" });
-  return browserPromise;
+  if (browserPromise) {
+    try {
+      const b = await browserPromise;
+      if (b.isConnected()) return b;
+    } catch {
+      // a prior launch rejected — fall through and try again
+    }
+    browserPromise = null; // dead/crashed browser: drop it so we relaunch
+  }
+  const p = chromium.launch({ channel: "chromium" });
+  // Don't cache a rejected launch, or every later call would reuse the failure.
+  p.catch(() => {
+    if (browserPromise === p) browserPromise = null;
+  });
+  browserPromise = p;
+  return p;
 }
 
 export async function closeValidator(): Promise<void> {
   if (browserPromise) {
-    const b = await browserPromise;
-    await b.close();
+    const p = browserPromise;
     browserPromise = null;
+    try {
+      await (await p).close();
+    } catch {
+      // already gone / failed to launch — nothing to close
+    }
   }
 }
 
@@ -51,6 +70,14 @@ export async function validate(
     errors.push("Remote <script src> is forbidden (must be self-contained)");
   if (/<link\s+[^>]*\bhref\s*=\s*["']https?:/i.test(html))
     errors.push("Remote <link href> is forbidden (must be self-contained)");
+  // A tool may only declare providers that actually exist in the catalog;
+  // otherwise it would ship and then fail the moment it calls WC.net.fetch.
+  const unknown = bundle.manifest.providers.filter((p) => !isProvider(p));
+  if (unknown.length)
+    errors.push(
+      `Declares unknown data provider(s): ${unknown.join(", ")}. ` +
+        `Use only the providers listed in the system prompt, or set providers="".`
+    );
   if (errors.length) return { pass: false, errors };
 
   // --- dynamic check: actually run it ---
@@ -74,23 +101,32 @@ export async function validate(
     await page.addScriptTag({ content: runtimeSrc });
 
     const wcErrors: string[] = await page.evaluate(
-      async ({ bundle, settleMs }) => {
+      async ({ bundle, settleMs, samples }) => {
         const RT = (window as any).WildcardRuntime;
         const errs: string[] = [];
-        let ready = false;
         const mounted = RT.mountTool(document.getElementById("stage"), {
           bundle,
           storage: RT.memoryStorage(),
+          // Stub egress with representative samples so live-data tools can be
+          // validated offline — we exercise the tool's code, not the upstream.
+          net: {
+            fetch: (provider: string) =>
+              Promise.resolve((samples as Record<string, unknown>)[provider] ?? {}),
+          },
           onError: (m: string) => errs.push(m),
         });
-        // Detect the SDK 'ready' signal by racing a short wait.
+        // Let the tool settle, then confirm the frame actually mounted into the
+        // DOM with a live content window — not just that mountTool returned an
+        // object. (`mounted.frame` is always set, so checking truthiness alone
+        // would be a no-op.)
         const frame = mounted.frame as HTMLIFrameElement;
         await new Promise((r) => setTimeout(r, settleMs));
-        ready = !!frame; // mount produced a frame
-        if (!ready) errs.push("Tool frame failed to mount");
+        if (!frame.isConnected || !frame.contentWindow) {
+          errs.push("Tool frame failed to mount");
+        }
         return errs;
       },
-      { bundle: bundle as any, settleMs: opts.settleMs ?? 400 }
+      { bundle: bundle as any, settleMs: opts.settleMs ?? 400, samples: providerSamples() }
     );
 
     errors.push(...wcErrors, ...consoleErrors);

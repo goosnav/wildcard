@@ -2,17 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import {
   generate,
   getMe,
+  getManifest,
   verifyMagicLink,
   logout,
+  deleteAccount,
   getSession,
   type GenEvent,
   type AuthUser,
   type Quota,
+  type AppManifest,
 } from "./api";
 import {
   getAllTools,
   putTool,
   deleteTool as deleteToolFromDb,
+  clearAllLocalData,
   type SavedTool,
 } from "./idb";
 import { PromptBar } from "./components/PromptBar";
@@ -20,12 +24,18 @@ import { BuildView, eventToLine, type BuildLine } from "./components/BuildView";
 import { HomeGrid } from "./components/HomeGrid";
 import { ToolRunner } from "./components/ToolRunner";
 import { SourceView } from "./components/SourceView";
+import { EditBar } from "./components/EditBar";
+import { LegalLinks, LegalModal, type LegalDocId } from "./components/Legal";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
+import { AdminDashboard } from "./components/AdminDashboard";
+import { Account } from "./components/Account";
 
 type View =
   | { name: "home" }
   | { name: "build" }
+  | { name: "admin" }
+  | { name: "account" }
   | { name: "run"; tool: SavedTool; tab: "run" | "source" };
 
 export default function App() {
@@ -36,7 +46,14 @@ export default function App() {
   const [lines, setLines] = useState<BuildLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [manifest, setManifest] = useState<AppManifest | null>(null);
+  const [legalDoc, setLegalDoc] = useState<LegalDocId | null>(null);
   const booted = useRef(false);
+
+  // Public app config (version, live-data catalog, feature flags). Best-effort.
+  useEffect(() => {
+    getManifest().then(setManifest);
+  }, []);
 
   // Bootstrap auth: complete a magic-link sign-in, refresh after checkout, or
   // resolve the existing session. Then scrub one-time params from the URL.
@@ -128,6 +145,90 @@ export default function App() {
     setTools((prev) => prev.filter((t) => t.manifest.id !== tool.manifest.id));
   }
 
+  // Export the whole library as a JSON download (REQ-DATA-004).
+  function exportAllTools() {
+    const payload = {
+      app: "wildcard",
+      exportedAt: new Date().toISOString(),
+      tools,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wildcard-tools.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Delete the account server-side, then wipe all local data and sign out.
+  async function handleDeleteAccount() {
+    await deleteAccount(); // cancels subscription + clears the session
+    await clearAllLocalData();
+    setTools([]);
+    setUser(null);
+    setView({ name: "home" });
+  }
+
+  // Persist a hand-edited source bundle and re-run it. Same manifest id, so the
+  // tool keeps its place on the grid and its WC.storage data (REQ-EDIT-004).
+  async function saveToolSource(tool: SavedTool, files: SavedTool["files"]) {
+    const updated: SavedTool = { ...tool, files };
+    await putTool(updated);
+    setTools((prev) => prev.map((t) => (t.manifest.id === tool.manifest.id ? updated : t)));
+    setView({ name: "run", tool: updated, tab: "run" });
+  }
+
+  // Edit-with-AI (REQ-EDIT-003): regenerate the current tool with its source as
+  // context. Shows the same streaming build view; on success the updated tool
+  // replaces the original in place. A failed edit leaves the original untouched.
+  async function editTool(original: SavedTool, instruction: string) {
+    if (user && !user.quota.canBuild) {
+      setShowPaywall(true);
+      return;
+    }
+    setBusy(true);
+    setLines([{ text: `“${instruction}”`, kind: "status" }]);
+    setView({ name: "build" });
+    const onEvent = (e: GenEvent) => {
+      const line = eventToLine(e);
+      if (line) setLines((prev) => [...prev, line]);
+    };
+    try {
+      const result = await generate(instruction, onEvent, original);
+      applyQuota(result.quota);
+      if (result.ok) {
+        const tool: SavedTool = {
+          manifest: result.manifest,
+          files: result.files,
+          createdAt: original.createdAt, // keep its original place on the grid
+        };
+        await putTool(tool);
+        setTools((prev) =>
+          prev.some((t) => t.manifest.id === tool.manifest.id)
+            ? prev.map((t) => (t.manifest.id === tool.manifest.id ? tool : t))
+            : [tool, ...prev]
+        );
+        setView({ name: "run", tool, tab: "run" });
+      } else if (result.paywall) {
+        setView({ name: "run", tool: original, tab: "run" });
+        setShowPaywall(true);
+      } else {
+        setLines((prev) => [...prev, { text: result.reason, kind: "fail" }]);
+      }
+    } catch (err) {
+      setLines((prev) => [
+        ...prev,
+        {
+          text: err instanceof Error ? err.message : "Something went wrong editing that.",
+          kind: "fail",
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function signOut() {
     await logout();
     setUser(null);
@@ -155,12 +256,27 @@ export default function App() {
           🃏 Wild Card
         </button>
         <div className="account">
+          {user.isAdmin && (
+            <button
+              className={`admin-link${view.name === "admin" ? " active" : ""}`}
+              onClick={() => setView({ name: "admin" })}
+            >
+              Dashboard
+            </button>
+          )}
           <button
             className={`quota-badge${q.plan === "free" && q.remaining === 0 ? " quota-empty" : ""}`}
             onClick={() => q.plan === "free" && setShowPaywall(true)}
             title={user.email}
           >
             {quotaLabel}
+          </button>
+          <button
+            className={`account-link${view.name === "account" ? " active" : ""}`}
+            onClick={() => setView({ name: "account" })}
+            title="Account & settings"
+          >
+            ⚙
           </button>
           <button className="signout" onClick={signOut} title="Sign out">
             ⎋
@@ -169,7 +285,21 @@ export default function App() {
       </header>
 
       <main className="content">
-        {view.name !== "run" && <PromptBar busy={busy} onSubmit={build} />}
+        {(view.name === "home" || view.name === "build") && (
+          <PromptBar busy={busy} onSubmit={build} />
+        )}
+
+        {view.name === "admin" && <AdminDashboard />}
+
+        {view.name === "account" && (
+          <Account
+            user={user}
+            toolCount={tools.length}
+            billingEnabled={manifest?.features.billing ?? false}
+            onExportAll={exportAllTools}
+            onDeleteAccount={handleDeleteAccount}
+          />
+        )}
 
         {view.name === "home" && (
           <HomeGrid
@@ -210,12 +340,33 @@ export default function App() {
             {view.tab === "run" ? (
               <ToolRunner bundle={view.tool} />
             ) : (
-              <SourceView bundle={view.tool} />
+              <SourceView
+                bundle={view.tool}
+                onSave={(files) => saveToolSource(view.tool, files)}
+              />
             )}
+            <EditBar busy={busy} onSubmit={(instruction) => editTool(view.tool, instruction)} />
           </div>
         )}
       </main>
 
+      <footer className="appfoot">
+        {manifest && (
+          <span>
+            Wild Card v{manifest.version}
+            {manifest.providers.length > 0 && (
+              <span title={manifest.providers.map((p) => p.label).join(", ")}>
+                {" "}· {manifest.providers.length} live-data source
+                {manifest.providers.length === 1 ? "" : "s"}
+              </span>
+            )}
+            <span aria-hidden> · </span>
+          </span>
+        )}
+        <LegalLinks onOpen={setLegalDoc} />
+      </footer>
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
       {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
     </div>
   );
