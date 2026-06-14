@@ -31,6 +31,13 @@ describe("GET /v1/manifest", () => {
   });
 });
 
+describe("GET /v1/reports", () => {
+  it("is admin-gated — 401 without a session", async () => {
+    const res = await app.request("/v1/reports");
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("GET /health", () => {
   it("reports core subsystem status", async () => {
     const res = await app.request("/health");

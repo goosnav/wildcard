@@ -35,6 +35,7 @@ import { quotaFor, publicUser, FREE_BUILD_LIMIT } from "./quota.js";
 import { isAdminEmail, adminOverview, MONTHLY_PRICE_USD } from "./admin.js";
 import { providerCatalog, callProvider } from "./providers.js";
 import { classifyPrompt } from "./safety.js";
+import { recordRefusal, moderationReport } from "./moderation.js";
 import {
   generateLimiter,
   netLimiter,
@@ -191,6 +192,26 @@ app.get("/v1/admin/overview", async (c) => {
   return c.json(await adminOverview());
 });
 
+// Operational report for the owner: the account/revenue roll-up plus runtime
+// signals — config wiring, the build-cost ceiling pressure, and a moderation
+// snapshot (safety refusals since restart). One call for an at-a-glance ops view.
+app.get("/v1/reports", async (c) => {
+  const admin = await requireAdmin(c);
+  if (admin instanceof Response) return admin;
+  return c.json({
+    generatedAt: Date.now(),
+    overview: await adminOverview(),
+    config: {
+      provider: activeProviderName(),
+      store: await backendName(),
+      email: emailConfigured(),
+      billing: stripe.isConfigured(),
+    },
+    guard: guardStatus(),
+    moderation: moderationReport(),
+  });
+});
+
 // Public app manifest (Doc 04 §4.7): everything the client needs to configure
 // itself without hardcoding — version, the free-build allowance, price, the
 // live-data catalog, and which optional features are wired. No auth, no secrets.
@@ -258,6 +279,7 @@ app.post("/v1/generate", async (c) => {
   // client renders the honest message exactly like any other unbuildable result.
   const verdict = classifyPrompt(prompt);
   if (!verdict.allowed) {
+    recordRefusal("input", verdict.category ?? "unknown");
     console.warn(`[safety] refused a "${verdict.category}" prompt for user ${user.id}`);
     return streamSSE(c, async (stream) => {
       await stream.writeSSE({

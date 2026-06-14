@@ -7,6 +7,7 @@ import type { Bundle } from "@wildcard/runtime";
 import { parseBundle, ContractError } from "./contract.js";
 import { validate, type ValidationResult } from "./validate.js";
 import { screenGeneratedSource } from "./safety.js";
+import { recordRefusal } from "./moderation.js";
 
 /** A model is anything that can turn messages into a text completion. Injectable
  *  so the repair loop can be tested with a fake model (no API key needed). */
@@ -125,6 +126,7 @@ export async function generateTool(
       // source trips the unambiguous-malware blocklist, even if it ran cleanly.
       const screen = screenGeneratedSource(bundle.files);
       if (!screen.allowed) {
+        recordRefusal("output", screen.category ?? "unknown");
         const reason = screen.message ?? "I can't ship that one.";
         onEvent({ type: "failed", reason });
         return { ok: false, reason, turns: turn };
