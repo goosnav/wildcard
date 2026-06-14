@@ -7,8 +7,31 @@
 
 import type { Bundle, StorageAdapter } from "@wildcard/runtime";
 
+/** A prior snapshot of a tool's files, kept so an edit can be reverted. */
+export interface ToolVersion {
+  files: Bundle["files"];
+  savedAt: number;
+  note?: string;
+}
+
 export interface SavedTool extends Bundle {
   createdAt: number;
+  /** Previous versions, newest first. Capped — see HISTORY_LIMIT. */
+  history?: ToolVersion[];
+}
+
+export const HISTORY_LIMIT = 10;
+
+/** Return a copy of `tool` with `files` replaced and the PREVIOUS files pushed
+ *  onto history (newest first, capped). Pure — callers persist the result. */
+export function withNewVersion(
+  tool: SavedTool,
+  files: Bundle["files"],
+  note: string
+): SavedTool {
+  const prior: ToolVersion = { files: tool.files, savedAt: Date.now(), note };
+  const history = [prior, ...(tool.history ?? [])].slice(0, HISTORY_LIMIT);
+  return { ...tool, files, history };
 }
 
 const DB_NAME = "wildcard";

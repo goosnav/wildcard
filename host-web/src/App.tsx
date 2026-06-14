@@ -17,6 +17,7 @@ import {
   putTool,
   deleteTool as deleteToolFromDb,
   clearAllLocalData,
+  withNewVersion,
   type SavedTool,
 } from "./idb";
 import { PromptBar } from "./components/PromptBar";
@@ -25,6 +26,7 @@ import { HomeGrid } from "./components/HomeGrid";
 import { ToolRunner } from "./components/ToolRunner";
 import { SourceView } from "./components/SourceView";
 import { EditBar } from "./components/EditBar";
+import { ToolHistory } from "./components/ToolHistory";
 import { LegalLinks, LegalModal, type LegalDocId } from "./components/Legal";
 import { SignIn } from "./components/SignIn";
 import { Paywall } from "./components/Paywall";
@@ -173,7 +175,18 @@ export default function App() {
   // Persist a hand-edited source bundle and re-run it. Same manifest id, so the
   // tool keeps its place on the grid and its WC.storage data (REQ-EDIT-004).
   async function saveToolSource(tool: SavedTool, files: SavedTool["files"]) {
-    const updated: SavedTool = { ...tool, files };
+    const updated = withNewVersion(tool, files, "Manual edit");
+    await putTool(updated);
+    setTools((prev) => prev.map((t) => (t.manifest.id === tool.manifest.id ? updated : t)));
+    setView({ name: "run", tool: updated, tab: "run" });
+  }
+
+  // Revert a tool to one of its saved previous versions. The current version is
+  // snapshotted into history first, so a revert is itself undoable.
+  async function revertTool(tool: SavedTool, index: number) {
+    const version = tool.history?.[index];
+    if (!version) return;
+    const updated = withNewVersion(tool, version.files, "Reverted");
     await putTool(updated);
     setTools((prev) => prev.map((t) => (t.manifest.id === tool.manifest.id ? updated : t)));
     setView({ name: "run", tool: updated, tab: "run" });
@@ -198,9 +211,12 @@ export default function App() {
       const result = await generate(instruction, onEvent, original);
       applyQuota(result.quota);
       if (result.ok) {
+        // Snapshot the pre-edit version into history, then apply the new
+        // manifest/files (the edit may have renamed the tool).
+        const snapshot = withNewVersion(original, result.files, `Edit: “${instruction}”`);
         const tool: SavedTool = {
+          ...snapshot,
           manifest: result.manifest,
-          files: result.files,
           createdAt: original.createdAt, // keep its original place on the grid
         };
         await putTool(tool);
@@ -336,6 +352,10 @@ export default function App() {
                   Source
                 </button>
               </div>
+              <ToolHistory
+                tool={view.tool}
+                onRevert={(index) => revertTool(view.tool, index)}
+              />
             </div>
             {view.tab === "run" ? (
               <ToolRunner bundle={view.tool} />
